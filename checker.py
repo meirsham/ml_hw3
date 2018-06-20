@@ -236,6 +236,7 @@ class Evaluator:
 
     def evaluate_agent(self):
         for step in range(self.steps):
+            print(self.state_to_agent()[1])
             action = self.agent.choose_next_action(self.state_to_agent()[0], self.state_to_agent()[1])
             if not is_action_legal(action):
                 raise Exception("illegal action!", action, "happened at step number:", step)
@@ -303,10 +304,26 @@ if __name__ == '__main__':
          {"red": 0.5, "green": 0.1, "blue": 0.1, "yellow": 0.1},
          ("red",)),
     )
+    problems2 = (
+
+        ((
+             (99, 99, 99, 99, 99, 99, 99),
+             (99, 13, 12, 66, 12, 13, 99),
+             (99, 11, 11, 11, 11, 11, 99),
+             (99, 12, 12, 11, 13, 13, 99),
+             (99, 12, 12, 11, 13, 13, 99),
+             (99, 12, 12, 11, 13, 13, 99),
+             (99, 99, 99, 99, 99, 99, 99),
+         ),
+         70,
+         {"11": create_uniform_probability(0.5, 2), "12": create_exponential_probability(1.5),
+          "13": create_exponential_probability(1.7)},
+         {"red": 0.9, "green": 0.7, "blue": 0.4, "yellow": 0.4},
+         ()),)
 
     results = []
 
-    for problem, num_of_steps, pill_rewards_dict, ghost_movement_probabilities, diagonal_moving in problems:
+    for problem, num_of_steps, pill_rewards_dict, ghost_movement_probabilities, diagonal_moving in problems2:
         my_eval = Evaluator(ex3.PacmanController(problem, num_of_steps), problem, num_of_steps,
                             pill_rewards_dict, ghost_movement_probabilities, diagonal_moving)
         results.append(my_eval.evaluate_agent())
