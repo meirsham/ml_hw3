@@ -2,6 +2,7 @@ from copy import deepcopy
 import random
 import ex3
 import math
+import utils
 import time
 
 RESET_CONSTANT = -5
@@ -236,11 +237,16 @@ class Evaluator:
 
     def evaluate_agent(self):
         for step in range(self.steps):
-            print(self.state_to_agent()[1])
+            #print(self.state_to_agent()[1])
             action = self.agent.choose_next_action(self.state_to_agent()[0], self.state_to_agent()[1])
             if not is_action_legal(action):
                 raise Exception("illegal action!", action, "happened at step number:", step)
             self.change_state_after_action(action)
+            e1 = self.agent.e1
+            e2 = self.agent.e2
+            e3 = self.agent.e3
+            print("\naction %s, reward: %s, e1 %s, e2 %s, e3 %s  " % (str(action),self.accumulated_reward,e1,e2,e3) )
+            utils.print_table(self.state_to_agent()[0])
         return self.accumulated_reward
 
     def move_pacman_to_walkable_tile(self, current_tile, next_tile):
@@ -267,7 +273,7 @@ if __name__ == '__main__':
              (99, 12, 12, 11, 13, 13, 99),
              (99, 99, 99, 99, 99, 99, 99),
          ),
-         70,
+         80,
          {"11": create_uniform_probability(0.5, 2), "12": create_exponential_probability(1.5),
           "13": create_exponential_probability(1.7)},
          {"red": 0.9, "green": 0.7, "blue": 0.4, "yellow": 0.4},
@@ -308,14 +314,14 @@ if __name__ == '__main__':
 
         ((
              (99, 99, 99, 99, 99, 99, 99),
-             (99, 13, 11, 11, 12, 13, 99),
+             (99, 13, 12, 66, 12, 13, 99),
              (99, 11, 11, 11, 11, 11, 99),
-             (99, 11, 66, 11, 13, 11, 99),
-             (99, 12, 11, 11, 13, 13, 99),
+             (99, 12, 12, 11, 13, 13, 99),
+             (99, 12, 12, 11, 13, 13, 99),
              (99, 12, 12, 11, 13, 13, 99),
              (99, 99, 99, 99, 99, 99, 99),
          ),
-         70,
+         75,
          {"11": create_uniform_probability(0.5, 2), "12": create_exponential_probability(1.5),
           "13": create_exponential_probability(1.7)},
          {"red": 0.9, "green": 0.7, "blue": 0.4, "yellow": 0.4},
@@ -323,7 +329,7 @@ if __name__ == '__main__':
 
     results = []
 
-    for problem, num_of_steps, pill_rewards_dict, ghost_movement_probabilities, diagonal_moving in problems2:
+    for problem, num_of_steps, pill_rewards_dict, ghost_movement_probabilities, diagonal_moving in problems:
         my_eval = Evaluator(ex3.PacmanController(problem, num_of_steps), problem, num_of_steps,
                             pill_rewards_dict, ghost_movement_probabilities, diagonal_moving)
         results.append(my_eval.evaluate_agent())

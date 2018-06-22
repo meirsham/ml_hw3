@@ -4,6 +4,7 @@ import checker
 import copy as c
 
 ids = ["000000000", "111111111"]
+COLOR_ORDERED = ["blue","green","yellow","red"]
 
 def get_next_tile(current_tile,action):
     current_tile_x, current_tile_y = current_tile
@@ -15,13 +16,16 @@ def get_next_tile(current_tile,action):
         next_tile = (current_tile_x + 1, current_tile_y)
     if action == "L":
         next_tile = (current_tile_x, current_tile_y - 1)
+    if action == 0:
+        next_tile = (current_tile_x, current_tile_y)
     return next_tile
 
 def cal_diff(loc1,loc2):
     return [loc1[0]-loc2[0],loc1[1]-loc2[1]]
 
-def get_eligible_moves(tile):
+def get_eligible_moves(color,tile):
     r,c=tile
+
     moves = []
     if r > 0:
         moves+=["D"]
@@ -31,10 +35,27 @@ def get_eligible_moves(tile):
         moves+= ["R"]
     elif c < 0:
         moves+=["L"]
+    if color is "blue" and len(moves) > 1:
+        #"merge move bec blue can go diagnol.
+        if "D" in moves and "L" in moves:
+            moves = ["DL"]
+        elif  "D" in moves and "R" in moves:
+            moves = ["DR"]
+        elif "U" in moves and "L" in moves:
+            moves = ["UL"]
+        elif "U" in moves and "R" in moves:
+            moves = ["UR"]
     return moves
 
+def get_list_values(color,dict_colors):
+    if color in dict_colors:
+        return dict_colors[color]
+    else:
+        return [0]
+
+
 def convert_dictionary_to_tuple(poss_state_dictionary):
-    # TODO: Function receives a dictionary of dictionaries
+    # Done: Function receives a dictionary of dictionaries
     # Returns flat 5-tuple of states representing pacman, ghost actions
     # e.g.
     # poss_state_dictionary = {'U': {'green': ['U', 'L'], 'blue': ['D'],
@@ -43,53 +64,246 @@ def convert_dictionary_to_tuple(poss_state_dictionary):
     # returns: list of list of possible moves ordered by pacman, blue,yellow,green,red
     # 0 if doesn't exist
     # [["U","D","L","L",0],["U","D","L","L",0],["R"....etc.]]
-
+    # Note for "Blue" - "DL" means down-left diagnol, "DR" means down-right diag, "UL" means up-left diag and "UR" means up-right diagnol.
     #
-    return [["U","D","L","L",0]]
-    pass
+    # The code is naively written b/c of time constraints , and can definitely be improved by using recursion or simple functions.
+    # pacman moves
+    final_list = []
+    for pac_action,color_dic in poss_state_dictionary.items():
+        #pac_action # pacman's action
+        #color_dic # key:value
+        blue_list = get_list_values("blue",color_dic)
+        green_list = get_list_values("green",color_dic)
+        yellow_list = get_list_values("yellow",color_dic)
+        red_list = get_list_values("red",color_dic)
+
+        full_list = [[pac_action,blue_list[0],green_list[0],yellow_list[0],red_list[0]]]
+
+        for i,a_list in enumerate([blue_list,green_list,yellow_list,red_list]):
+            if len(a_list) == 2:
+                temp_list= c.deepcopy(full_list)
+                for inside_temp_list in temp_list:
+                    inside_temp_list[i+1] = a_list[1]
+                full_list += temp_list
+
+
+        final_list +=full_list
+
+
+    return final_list
+
 
 class PacmanState:
 
     def __init__(self,board_state,last_pacman_action=None,e1=0,e2=0,e3=0):
         # board
         self.state, self.special_things = checker.problem_to_state(board_state)
+        self.size_of_board = len(self.state)
         self.last_pacman_action=last_pacman_action
         self.last_type_eaten = 0
-
         self.score = 0
         self.h_val = 0
+        self.numb_of_ghosts = self.get_num_ghosts()
+        self.numb_of_dots_within_three = self.get_dot_neighbors()
+        self.numb_of_dots_div_board_size = self.numb_of_dots_within_three/self.size_of_board
 
         # Expected Values for each type of dot
         self.e1=e1
         self.e2=e2
         self.e3=e3
+    def get_size_of_board(self):
+        len(self.state)
 
-    def move_pacman_ghosts(self,actions_list):
+    def get_num_ghosts(self):
+        i = 0
+        for k,j in checker.COLOR_CODES.items():
+            if k in self.special_things:
+                i+=1
+        return i
+
+    def get_dot_neighbors(self):
+        count = 0
+        if "pacman" not in self.special_things:
+            return -10
+
+        new_x,new_y= self.special_things["pacman"]
+        # Check left of pacman for sensors
+        queue = [[new_x,new_y]]
+        j=0
+        while j < 3:
+            new_x,new_y=queue.pop()
+            # left
+            ul = [new_x-1,new_y-1]
+            l = [new_x,new_y-1]
+            dl = [new_x+1,new_y-1]
+            list_of_points = [ul,l,dl]
+
+            for item in list_of_points:
+                flag = True
+                x=item[0]
+                y=item[1]
+                val = self.state[item[0],item[1]]
+                if val == 99:
+                    flag = False
+
+                elif self.state[item[0],item[1]] in (11, 12, 13):
+                    count += 1
+            if flag:
+                queue.append(l)
+
+            # right
+            ur = [new_x - 1, new_y + 1]
+            r = [new_x, new_y + 1]
+            dr = [new_x + 1, new_y + 1]
+            list_of_points = [dr, r, ur]
+
+            for item in list_of_points:
+                flag = True
+                val = self.state[item[0],item[1]]
+                if val == 99:
+                    flag = False
+
+                elif self.state[item[0],item[1]] in (11, 12, 13):
+                    count += 1
+            if flag:
+                queue.append(r)
+
+
+            u = [new_x-1,new_y]
+            if self.state[u[0],u[1]] in (11,12,13):
+                count+=1
+            if self.state[u[0],u[1]] is not 99:
+                queue.append(u)
+
+            d = [new_x,new_y+1]
+            if self.state[d[0],d[1]] in (11, 12, 13):
+                count += 1
+            if self.state[d[0],d[1]] is not 99:
+                queue.append(d)
+
+            j+=1
+
+        return count
+
+
+    def move_pacman_to_walkable_tile(self, current_tile, next_tile):
+        if self.state[next_tile] == 11:
+            #
+            self.score += self.e1
+
+
+        if self.state[next_tile] == 12:
+            self.score += self.e2
+        if self.state[next_tile] == 13:
+            self.score += self.e3
+
+        self.state[next_tile] = 66
+        self.state[current_tile] = 10
+        self.special_things["pacman"] = next_tile
+
+    def move_pacman_ghosts(self,move):
+
+        pacman_action = move[0]
+        ghost_moves = move[1:]
+        self.move_pacman(pacman_action)
+        self.move_ghosts(ghost_moves)
+        self.compute_h()
+
+    def move_ghosts(self,ghost_moves):
+
+        for j,color in enumerate(["blue","green","yellow","red"]):
+            action = ghost_moves[j]
+            if action is 0:
+                pass
+            else:
+                ghost_place_x, ghost_place_y = self.special_things[color]
+                current_tile = self.special_things[color]
+                previous_tile_pill_number = self.state[current_tile] % 10
+                previous_tile_contained_pill = 1 <= previous_tile_pill_number <= 3
+                ghost_code = checker.COLOR_CODES[color]
+
+
+                next_tile = get_next_tile(current_tile,ghost_moves[j])
+
+                # movement result
+
+                # next tile is a regular tile (with or without a pill)
+                if 10 <= self.state[next_tile] <= 13:
+                    self.state[next_tile] = ghost_code + (self.state[next_tile] % 10)
+                    self.special_things[color] = next_tile
+
+                # poison
+                elif self.state[next_tile] == 77 or 70 <= self.state[next_tile] <= 73:
+                    self.numb_of_ghosts-=1
+                    if self.state[next_tile] == 77:
+                        self.state[next_tile] = 10
+                    else:
+                        self.state[next_tile] = 10 + previous_tile_pill_number
+                    del self.special_things[color]
+
+                # ghost got the pacman
+                elif self.state[next_tile] == 66 or self.state[next_tile] == 88:
+                    self.special_things["pacman"] = "dead"
+                    self.state[next_tile] = 88
+                    self.score = -5
+
+                if current_tile != next_tile:
+                    if previous_tile_contained_pill:
+                        self.state[current_tile] = 10 + previous_tile_pill_number
+                    else:
+                        self.state[current_tile] = 10
+
+
+
+    def move_pacman(self,action):
+        self.last_pacman_action = action
+
         # actions_list is ordered by pacman, blue, yellow, green, red
         # 0 if no action taken / ghost doesn't exist
         # ["U","D","L","L",0]
         # means that pacman moves U, blue ghost moves D, green moves L, yellow moves L, red doesn't exist.
-        print("Actions List")
-        print(actions_list)
-        # what is next_pacman tile ==
-        next_tile = get_next_tile(self.special_things["pacman"],actions_list[0])
 
+        next_tile = None
+        current_tile_x, current_tile_y = self.special_things["pacman"]
+        if action == "U":
+            next_tile = (current_tile_x - 1, current_tile_y)
+        if action == "R":
+            next_tile = (current_tile_x, current_tile_y + 1)
+        if action == "D":
+            next_tile = (current_tile_x + 1, current_tile_y)
+        if action == "L":
+            next_tile = (current_tile_x, current_tile_y - 1)
+
+        assert next_tile is not None
         self.last_type_eaten = self.state[next_tile]%10
-        self.last_pacman_action = actions_list[0]
 
-        # TODO Update state of board for pacman action and ghosts
-        # TODO Update h_val with new state of board
-        # If pacman dies, handle properly.
+        # wall
+        if self.state[next_tile] == 99:
+            return
 
-        pass
+        # walkable tile
+        if self.state[next_tile] in checker.WALKABLE_TILES:
+            self.move_pacman_to_walkable_tile((current_tile_x, current_tile_y), next_tile)
+            return
+
+        # ghosts and poison
+        if self.state[next_tile] in checker.LOSS_INDEXES:
+            self.state[next_tile] = 88
+            self.score = -5
+            self.state[(current_tile_x, current_tile_y)] = 10
+            self.special_things["pacman"] = "dead"
+
+        return
 
     def compute_h(self):
         # TODO
         # This function computes the heuristic value of the current state.
         # The function doesn't return anything.
         # for example, h_val = score - (# of ghosts remaining)^2
+        # md to nearest dot
 
-        self.h_val = 0 #new value
+        self.h_val = 10*self.score-10*self.numb_of_ghosts + 2*self.numb_of_dots_div_board_size  #new value
+
         pass
 
     def get_possible_moves(self,special_thing):
@@ -125,7 +339,7 @@ class PacmanState:
                 # find possible moves for the special things
                 ghost_location = self.special_things[color]
                 location_diff = cal_diff(next_pacman_location,ghost_location)
-                moves = get_eligible_moves(location_diff)
+                moves = get_eligible_moves(color,location_diff)
                 ghost_dict[color] = moves
 
         return ghost_dict
@@ -162,9 +376,10 @@ class PacmanController:
         self.list_of_values_type_3 = []
         self.last_pacman_action = None
         self.steps = steps
-        e1=0
-        e2=0
-        e3=0
+        self.rounds = 0
+        self.e1=1
+        self.e2=1
+        self.e3=1
 
 
     def update_expected_value_for_dot_types(self,accumulated_reward):
@@ -183,6 +398,7 @@ class PacmanController:
 
     def choose_next_action(self, state, accumulated_reward):
         # decrease step count
+        self.rounds +=1
         self.steps -= 1
 
         """Choose next action for pacman controller given the current state.
@@ -192,12 +408,13 @@ class PacmanController:
         # TODO: MUST ADD TIMER EFFECT
 
         # add value of type of dot to the correct list
-        self.update_expected_value_for_dot_types(accumulated_reward)
+        if self.rounds <= 10:
+            self.update_expected_value_for_dot_types(accumulated_reward)
+            self.compute_expected_values()
 
-        e1,e2,e3 = self.compute_expected_values()
 
-        # Current PacmanState
-        s_0 = PacmanState(state,self.last_pacman_action,e1,e2,e3)
+        # Current PacmanState # we should use inheritance ;-)
+        s_0 = PacmanState(state,self.last_pacman_action,self.e1,self.e2,self.e3)
 
         # If pacman dead - return reset.
         if "pacman" not in s_0.special_things:
@@ -215,9 +432,7 @@ class PacmanController:
 
         all_states = set() # List of all states
         # Now we iterate through all possible moves.
-        print(poss_state_dictionary)
         for move in possible_moves:
-            print(move)
             # iterate through all possible permutations
             temp = c.deepcopy(s_0)
 
@@ -234,7 +449,7 @@ class PacmanController:
         return self.last_pacman_action
 
     def find_max_h(self,all_states):
-        max_value = 0
+        max_value = all_states[0].h_val
         max_state = all_states[0]
         for s in all_states:
             if s.h_val >= max_value:
@@ -242,33 +457,27 @@ class PacmanController:
 
         return max_state
 
-    def create_list_of_all_possible_moves(ghost_move_dict):
-
-        # returns list of all possible moves. l1= pacman.
-
-        return [["R","R","R","R","R"],["R","R","R","R","L"],]
-
     def compute_expected_values(self):
         # Return expected values for dot 1, dot 2, dot 3
 
         # v1.0 = return mean inefficiently.
         if len(self.list_of_values_type_1)>0:
-            e1 = sum(self.list_of_values_type_1)/len(self.list_of_values_type_1)
+            self.e1 = sum(self.list_of_values_type_1)/len(self.list_of_values_type_1)
         else:
-            e1 = 0
+            self.e1 = 0
         if len(self.list_of_values_type_2)>0:
-            e2 = sum(self.list_of_values_type_2)/len(self.list_of_values_type_2)
+            self.e2 = sum(self.list_of_values_type_2)/len(self.list_of_values_type_2)
         else:
-            e2 = 0
+            self.e2 = 0
 
         if len(self.list_of_values_type_3)>0:
-            e3 = sum(self.list_of_values_type_3)/len(self.list_of_values_type_3)
+            self.e3 = sum(self.list_of_values_type_3)/len(self.list_of_values_type_3)
         else:
-            e3 = 0
+            self.e3 = 0
 
         # TODO: v2.0 guess distribution and return expected value.
 
-        return e1,e2,e3
+        return
 
 
 
