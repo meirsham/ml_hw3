@@ -317,7 +317,6 @@ class PacmanState:
         # pacman is alive and cannot move into a wall or a ghost or a poison!
         special_thing_moves = []
         current_tile = self.special_things[special_thing]
-        print(current_tile)
         next_tile = get_next_tile(current_tile,"U")
         if self.state[next_tile] not in checker.BLOCKING_CODES:
             special_thing_moves += ["U"]
