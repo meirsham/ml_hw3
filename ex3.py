@@ -16,6 +16,15 @@ def get_next_tile(current_tile,action):
         next_tile = (current_tile_x + 1, current_tile_y)
     if action == "L":
         next_tile = (current_tile_x, current_tile_y - 1)
+    if action == "UR":
+        next_tile = (current_tile_x-1, current_tile_y - 1)
+    if action == "DR":
+        next_tile = (current_tile_x+1, current_tile_y - 1)
+    if action == "UL":
+        next_tile = (current_tile_x-1, current_tile_y + 1)
+    if action == "DL":
+        next_tile = (current_tile_x+1, current_tile_y + 1)
+
     if action == 0:
         next_tile = (current_tile_x, current_tile_y)
     return next_tile
@@ -103,6 +112,7 @@ class PacmanState:
         self.last_type_eaten = 0
         self.score = 0
         self.h_val = 0
+        self.future_h_val = 0
         self.numb_of_ghosts = self.get_num_ghosts()
         self.numb_of_dots_within_three = self.get_dot_neighbors()
         self.numb_of_dots_div_board_size = self.numb_of_dots_within_three/self.size_of_board
@@ -111,6 +121,7 @@ class PacmanState:
         self.e1=e1
         self.e2=e2
         self.e3=e3
+
     def get_size_of_board(self):
         len(self.state)
 
@@ -185,7 +196,6 @@ class PacmanState:
 
         return count
 
-
     def move_pacman_to_walkable_tile(self, current_tile, next_tile):
         if self.state[next_tile] == 11:
             #
@@ -202,7 +212,6 @@ class PacmanState:
         self.special_things["pacman"] = next_tile
 
     def move_pacman_ghosts(self,move):
-
         pacman_action = move[0]
         ghost_moves = move[1:]
         self.move_pacman(pacman_action)
@@ -213,7 +222,7 @@ class PacmanState:
 
         for j,color in enumerate(["blue","green","yellow","red"]):
             action = ghost_moves[j]
-            if action is 0:
+            if action is 0 or color not in self.special_things:
                 pass
             else:
                 ghost_place_x, ghost_place_y = self.special_things[color]
@@ -252,8 +261,6 @@ class PacmanState:
                         self.state[current_tile] = 10 + previous_tile_pill_number
                     else:
                         self.state[current_tile] = 10
-
-
 
     def move_pacman(self,action):
         self.last_pacman_action = action
@@ -310,7 +317,7 @@ class PacmanState:
         # pacman is alive and cannot move into a wall or a ghost or a poison!
         special_thing_moves = []
         current_tile = self.special_things[special_thing]
-
+        print(current_tile)
         next_tile = get_next_tile(current_tile,"U")
         if self.state[next_tile] not in checker.BLOCKING_CODES:
             special_thing_moves += ["U"]
@@ -360,6 +367,9 @@ class PacmanState:
 
         return possible_state_diction
 
+    def set_real_h_value(self,round_2_h_val,gamma=0.9):
+        self.future_h_val = self.h_val+gamma*round_2_h_val
+        return
 
 class PacmanController:
     """This class is a controller for a pacman agent."""
@@ -410,8 +420,10 @@ class PacmanController:
         # add value of type of dot to the correct list
         if self.rounds <= 10:
             self.update_expected_value_for_dot_types(accumulated_reward)
-            self.compute_expected_values()
-
+            self.compute_expected_values_mean()
+        # TODO Imporve the way we compute expected values of dot types
+        # if self.rounds == 11:
+        #   self.compute_expected_values_plus()
 
         # Current PacmanState # we should use inheritance ;-)
         s_0 = PacmanState(state,self.last_pacman_action,self.e1,self.e2,self.e3)
@@ -422,7 +434,30 @@ class PacmanController:
         if s_0.special_things["pacman"] == "dead":
             return "reset"
 
+        all_next_round_possible_states = self.get_next_round_states(s_0)
 
+        # Find max in all_states
+
+        # second round
+        for each_state in all_next_round_possible_states:
+            round_2_states = []
+            if each_state.special_things["pacman"] is not "dead":
+                round_2_states = list(self.get_next_round_states(each_state))
+            temp_state = self.find_max_h(round_2_states)
+            if temp_state is not False:
+                each_state.set_real_h_value(temp_state.h_val)
+
+        # Find max "future_h_value"
+
+        state = self.find_max_future_h_value(list(all_next_round_possible_states))
+        # update action chosen of winning state.
+        self.last_pacman_action = state.last_pacman_action
+        self.last_type_eaten = state.last_type_eaten
+
+        return self.last_pacman_action
+
+    def get_next_round_states(self,s_0):
+        # s_0 = initial state.
         # Generate possible future states (1 turn ahead).
         # {Pacman_action: {dictionary of ghost actions}}
         poss_state_dictionary = s_0.get_next_moves()
@@ -430,7 +465,7 @@ class PacmanController:
 
         possible_moves = convert_dictionary_to_tuple(poss_state_dictionary)
 
-        all_states = set() # List of all states
+        all_states = set()  # List of all states
         # Now we iterate through all possible moves.
         for move in possible_moves:
             # iterate through all possible permutations
@@ -438,17 +473,11 @@ class PacmanController:
 
             temp.move_pacman_ghosts(move)
             all_states.add(temp)
-
-        # Find max in all_states
-        state = self.find_max_h(list(all_states))
-
-        # update action chosen of winning state.
-        self.last_pacman_action = state.last_pacman_action
-        self.last_type_eaten = state.last_type_eaten
-
-        return self.last_pacman_action
+        return all_states
 
     def find_max_h(self,all_states):
+        if len(all_states) is 0:
+            return False #Need to reset
         max_value = all_states[0].h_val
         max_state = all_states[0]
         for s in all_states:
@@ -457,7 +486,24 @@ class PacmanController:
 
         return max_state
 
-    def compute_expected_values(self):
+    def find_max_future_h_value(self,all_states):
+        if len(all_states) is 0:
+            return False  # Need to reset
+        max_value = all_states[0].future_h_val
+        max_state = all_states[0]
+        for s in all_states:
+            if s.h_val >= max_value:
+                max_state = s
+
+        return max_state
+
+    def compute_expected_values_plus(self):
+        # TODO find best distribution fit for each dot type based on 11 observations
+        # Set e1 = expected value of each distribution.
+        # HINT: https://stackoverflow.com/questions/6620471/fitting-empirical-distribution-to-theoretical-ones-with-scipy-python?lq=1
+        return
+
+    def compute_expected_values_mean(self):
         # Return expected values for dot 1, dot 2, dot 3
 
         # v1.0 = return mean inefficiently.
