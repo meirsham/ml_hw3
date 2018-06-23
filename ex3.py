@@ -2,7 +2,11 @@ import time
 import random
 import checker
 import copy as c
-
+import scipy.stats as st
+import warnings
+import numpy as np
+import pandas as pd
+import math as m
 ids = ["000000000", "111111111"]
 COLOR_ORDERED = ["blue","green","yellow","red"]
 
@@ -389,6 +393,9 @@ class PacmanController:
         self.e1=1
         self.e2=1
         self.e3=1
+        self.e1_flag = True
+        self.e2_flag = True
+        self.e3_flag = True
 
 
     def update_expected_value_for_dot_types(self,accumulated_reward):
@@ -409,6 +416,8 @@ class PacmanController:
         # decrease step count
         self.rounds +=1
         self.steps -= 1
+        if self.rounds % 5 ==0:
+            print("e1 %s %s, e2 %s %s, e3 %s %s" % (self.e1, self.e1_flag, self.e2, self.e2_flag, self.e3, self.e3_flag))
 
         """Choose next action for pacman controller given the current state.
         Action should be returned in the format described previous parts of the project.
@@ -417,12 +426,25 @@ class PacmanController:
         # TODO: MUST ADD TIMER EFFECT
 
         # add value of type of dot to the correct list
-        if self.rounds <= 10:
+        if self.rounds <= 25:
             self.update_expected_value_for_dot_types(accumulated_reward)
+            #print("updated all")
             self.compute_expected_values_mean()
-        # TODO Imporve the way we compute expected values of dot types
-        # if self.rounds == 11:
-        #   self.compute_expected_values_plus()
+
+        if self.e1_flag and len(self.list_of_values_type_1) == 5:
+            print("updated e1")
+            self.e1 = self.compute_expected_values_plus_start(1)
+            self.e1_flag = False
+        if self.e2_flag and len(self.list_of_values_type_2) == 5:
+            print("updated e2")
+            self.e1 = self.compute_expected_values_plus_start(2)
+            self.e2_flag = False
+        if self.e3_flag and len(self.list_of_values_type_3) == 5:
+            print("updated e3")
+            self.e3 = self.compute_expected_values_plus_start(3)
+            self.e3_flag = False
+
+
 
         # Current PacmanState # we should use inheritance ;-)
         s_0 = PacmanState(state,self.last_pacman_action,self.e1,self.e2,self.e3)
@@ -481,6 +503,7 @@ class PacmanController:
         max_state = all_states[0]
         for s in all_states:
             if s.h_val >= max_value:
+                max_value = s.h_val
                 max_state=s
 
         return max_state
@@ -491,36 +514,119 @@ class PacmanController:
         max_value = all_states[0].future_h_val
         max_state = all_states[0]
         for s in all_states:
-            if s.h_val >= max_value:
+            if s.future_h_val >= max_value:
+                max_value = s.future_h_val
                 max_state = s
 
         return max_state
 
-    def compute_expected_values_plus(self):
+    def compute_expected_values_plus_start(self,type_x):
+        if type_x is 1:
+            data = self.list_of_values_type_1
+        elif type_x is 2:
+            data = self.list_of_values_type_2
+        elif type_x is 3:
+            data = self.list_of_values_type_3
+
+        return self.compute_expected_values_guess_distribution(data)
+
+
+    def compute_expected_values_guess_distribution(self,data):
+        print("START")
+        #print(data)
         # TODO find best distribution fit for each dot type based on 11 observations
         # Set e1 = expected value of each distribution.
         # HINT: https://stackoverflow.com/questions/6620471/fitting-empirical-distribution-to-theoretical-ones-with-scipy-python?lq=1
-        return
+        # Distributions to check
+        DISTRIBUTIONS = [
+            st.alpha, st.anglit, st.arcsine, st.beta, st.betaprime, st.bradford, st.burr, st.cauchy, st.chi, st.chi2,
+            st.cosine,
+            st.dgamma, st.dweibull, st.erlang, st.expon, st.exponnorm, st.exponweib, st.exponpow, st.f, st.fatiguelife,
+            st.fisk,
+            st.foldcauchy, st.foldnorm, st.frechet_r, st.frechet_l, st.genlogistic, st.genpareto, st.gennorm,
+            st.genexpon,
+            st.genextreme, st.gausshyper, st.gamma, st.gengamma, st.genhalflogistic, st.gilbrat, st.gompertz,
+            st.gumbel_r,
+            st.gumbel_l, st.halfcauchy, st.halflogistic, st.halfnorm, st.halfgennorm, st.hypsecant, st.invgamma,
+            st.invgauss,
+            st.invweibull, st.johnsonsb, st.johnsonsu, st.ksone, st.kstwobign, st.laplace, st.levy, st.levy_l,
+            st.levy_stable,
+            st.logistic, st.loggamma, st.loglaplace, st.lognorm, st.lomax, st.maxwell, st.mielke, st.nakagami, st.ncx2,
+            st.ncf,
+            st.nct, st.norm, st.pareto, st.pearson3, st.powerlaw, st.powerlognorm, st.powernorm, st.rdist,
+            st.reciprocal,
+            st.rayleigh, st.rice, st.recipinvgauss, st.semicircular, st.t, st.triang, st.truncexpon, st.truncnorm,
+            st.tukeylambda,
+            st.uniform, st.vonmises, st.vonmises_line, st.wald, st.weibull_min, st.weibull_max, st.wrapcauchy
+        ]
+        # for testing purposes
+        DISTRIBUTIONS_SHORT = [st.gamma, st.beta,st.rayleigh,st.norm, st.pareto]
+
+        # Best holders
+        best_distribution = st.norm
+        best_params = (0.0, 1.0)
+        best_sse = np.inf
+
+        # Estimate distribution parameters from data
+        new_expected_value = 0
+        for distribution in DISTRIBUTIONS:
+            # Try to fit the distribution
+            try:
+                # Ignore warnings from data that can't be fit
+                with warnings.catch_warnings():
+                    warnings.filterwarnings('ignore')
+                    warnings.simplefilter("ignore")
+
+                    params = distribution.fit(data)
+                    # Separate parts of parameters
+                    arg = params[:-2]
+                    loc = params[-2]
+                    scale = params[-1]
+
+                    expected_value = distribution.expect(None,arg,loc,scale)
+                    # Get histogram of original data
+                    y, x = np.histogram(data, bins=10, density=True)
+                    x = (x + np.roll(x, -1))[:-1] / 2.0
+
+
+                    # Calculate fitted PDF and error with fit in distribution
+                    pdf = distribution.pdf(x, loc=loc, scale=scale, *arg)
+                    sse = m.fabs(np.sum(np.power(y - pdf, 2.0)))
+
+                    # identify if this distribution is better
+                    sse = 0
+                    if best_sse > sse:
+                        best_distribution = distribution
+                        best_params = params
+                        best_sse = sse
+                        new_expected_value = expected_value
+                        print("updated SSE")
+            except Exception:
+                pass
+
+        return new_expected_value
 
     def compute_expected_values_mean(self):
         # Return expected values for dot 1, dot 2, dot 3
 
         # v1.0 = return mean inefficiently.
-        if len(self.list_of_values_type_1)>0:
-            self.e1 = sum(self.list_of_values_type_1)/len(self.list_of_values_type_1)
-        else:
-            self.e1 = 0
-        if len(self.list_of_values_type_2)>0:
-            self.e2 = sum(self.list_of_values_type_2)/len(self.list_of_values_type_2)
-        else:
-            self.e2 = 0
+        if self.e1_flag:
+            if len(self.list_of_values_type_1)>0:
+                self.e1 = sum(self.list_of_values_type_1)/len(self.list_of_values_type_1)
+            else:
+                self.e1 = max(self.e1,self.e2,self.e3,0)
+        if self.e2_flag:
+            if len(self.list_of_values_type_2)>0:
+                self.e2 = sum(self.list_of_values_type_2)/len(self.list_of_values_type_2)
+            else:
+                self.e2 = max(self.e1,self.e2,self.e3,0)
+        if self.e3_flag:
+            if len(self.list_of_values_type_3)>0:
+                self.e3 = sum(self.list_of_values_type_3)/len(self.list_of_values_type_3)
+            else:
+                self.e3 = max(self.e1,self.e2,self.e3,0)
 
-        if len(self.list_of_values_type_3)>0:
-            self.e3 = sum(self.list_of_values_type_3)/len(self.list_of_values_type_3)
-        else:
-            self.e3 = 0
-
-        # TODO: v2.0 guess distribution and return expected value.
+        # TO DO: v2.0 guess distribution and return expected value.
 
         return
 
