@@ -120,7 +120,6 @@ class PacmanState:
         self.numb_of_ghosts = self.get_num_ghosts()
         self.numb_of_dots_within_three = self.get_dot_neighbors()
         self.numb_of_dots_div_board_size = self.numb_of_dots_within_three/self.size_of_board
-
         # Expected Values for each type of dot
         self.e1=e1
         self.e2=e2
@@ -138,7 +137,7 @@ class PacmanState:
 
     def get_dot_neighbors(self):
         count = 0
-        if "pacman" not in self.special_things:
+        if "pacman" not in self.special_things or self.special_things["pacman"] is "dead":
             return -10
 
         new_x,new_y= self.special_things["pacman"]
@@ -220,7 +219,6 @@ class PacmanState:
         ghost_moves = move[1:]
         self.move_pacman(pacman_action)
         self.move_ghosts(ghost_moves)
-        self.compute_h()
 
     def move_ghosts(self,ghost_moves):
 
@@ -312,8 +310,10 @@ class PacmanState:
         # The function doesn't return anything.
         # for example, h_val = score - (# of ghosts remaining)^2
         # md to nearest dot
+        self.numb_of_dots_within_three = self.get_dot_neighbors()
+        self.numb_of_dots_div_board_size = self.numb_of_dots_within_three/self.size_of_board
 
-        self.h_val = 10*self.score-10*self.numb_of_ghosts + 2*self.numb_of_dots_div_board_size  #new value
+        self.h_val = 10*self.score-5*self.numb_of_ghosts**2 + 2*self.numb_of_dots_div_board_size  #new value
 
         pass
 
@@ -340,7 +340,7 @@ class PacmanState:
         return special_thing_moves
 
     def get_ghost_moves(self,next_pacman_location):
-        # TODO: Returns dictionary of all ghosts and their possible moves
+        # TO DO: Returns dictionary of all ghosts and their possible moves
         ghost_dict = {}
 
         #pacman_location = self.special_things["pacman"]
@@ -396,9 +396,22 @@ class PacmanController:
         self.e1_flag = True
         self.e2_flag = True
         self.e3_flag = True
+        self.last_time_round = 0
+
+        self.distribution = st.norm
+        # Need to create different distributions for each type of ball. {1: st.norm, 2: st.norm, 3: st.norm}
+        self.best_sse = np.inf
+        self.best_params = (0.0, 1.0)
+        self.dist_iter_1 = 0
+
+        self.dist_iter_2 = 0
+        self.dist_iter_3 = 0
+        self.state = state #original state.
 
 
     def update_expected_value_for_dot_types(self,accumulated_reward):
+        if self.last_pacman_action is "reset":
+            return
 
         diff = accumulated_reward - self.last_state_reward
 
@@ -413,46 +426,60 @@ class PacmanController:
         pass
 
     def choose_next_action(self, state, accumulated_reward):
+        # TO DO: MUST ADD TIMER EFFECT
+
+        if self.rounds is 0:
+            self.last_time_round=time.time()
+            diff = 0
+        else:
+            temp_time = time.time()
+            diff = temp_time-self.last_time_round
+            self.last_time_round = temp_time
+        print("Round %s, Time: %s, length: %s " % (self.rounds, time.time(), diff))
+        """Choose next action for pacman controller given the current state.
+            Action should be returned in the format described previous parts of the project.
+            This method MUST terminate within the specified timeout (5 seconds)
+        """
+
         # decrease step count
         self.rounds +=1
         self.steps -= 1
         if self.rounds % 5 ==0:
             print("e1 %s %s, e2 %s %s, e3 %s %s" % (self.e1, self.e1_flag, self.e2, self.e2_flag, self.e3, self.e3_flag))
 
-        """Choose next action for pacman controller given the current state.
-        Action should be returned in the format described previous parts of the project.
-        This method MUST terminate within the specified timeout.
-        """
-        # TODO: MUST ADD TIMER EFFECT
-
         # add value of type of dot to the correct list
-        if self.rounds <= 25:
+        if self.state is not state:
             self.update_expected_value_for_dot_types(accumulated_reward)
+
+        if self.rounds <= 25:
+
             #print("updated all")
             self.compute_expected_values_mean()
 
-        if self.e1_flag and len(self.list_of_values_type_1) == 5:
+        if len(self.list_of_values_type_1) >= 8:
+
+        #if self.e1_flag and len(self.list_of_values_type_1) == 8:
             print("updated e1")
+            print(self.list_of_values_type_1)
             self.e1 = self.compute_expected_values_plus_start(1)
             self.e1_flag = False
-        if self.e2_flag and len(self.list_of_values_type_2) == 5:
+        if self.e2_flag and len(self.list_of_values_type_2) == 8:
             print("updated e2")
+            print(self.list_of_values_type_2)
             self.e1 = self.compute_expected_values_plus_start(2)
             self.e2_flag = False
-        if self.e3_flag and len(self.list_of_values_type_3) == 5:
+        if self.e3_flag and len(self.list_of_values_type_3) == 8:
             print("updated e3")
+            print(self.list_of_values_type_3)
+
             self.e3 = self.compute_expected_values_plus_start(3)
             self.e3_flag = False
-
-
-
-        # Current PacmanState # we should use inheritance ;-)
+        
+        # Current PacmanState # we should've use inheritance ;-)
         s_0 = PacmanState(state,self.last_pacman_action,self.e1,self.e2,self.e3)
 
         # If pacman dead - return reset.
-        if "pacman" not in s_0.special_things:
-            return "reset"
-        if s_0.special_things["pacman"] == "dead":
+        if "pacman" not in s_0.special_things or s_0.special_things["pacman"] == "dead":
             return "reset"
 
         all_next_round_possible_states = self.get_next_round_states(s_0)
@@ -471,7 +498,8 @@ class PacmanController:
         # Find max "future_h_value"
 
         state = self.find_max_future_h_value(list(all_next_round_possible_states))
-        # update action chosen of winning state.
+
+        # Update action chosen of winning state.
         self.last_pacman_action = state.last_pacman_action
         self.last_type_eaten = state.last_type_eaten
 
@@ -480,19 +508,22 @@ class PacmanController:
     def get_next_round_states(self,s_0):
         # s_0 = initial state.
         # Generate possible future states (1 turn ahead).
+
         # {Pacman_action: {dictionary of ghost actions}}
         poss_state_dictionary = s_0.get_next_moves()
-        # convert dictionary of ghost actions into 5-tuple
 
+        # convert dictionary of ghost actions into 5-tuple
         possible_moves = convert_dictionary_to_tuple(poss_state_dictionary)
 
         all_states = set()  # List of all states
         # Now we iterate through all possible moves.
+
         for move in possible_moves:
             # iterate through all possible permutations
             temp = c.deepcopy(s_0)
 
             temp.move_pacman_ghosts(move)
+            temp.compute_h()
             all_states.add(temp)
         return all_states
 
@@ -528,48 +559,74 @@ class PacmanController:
         elif type_x is 3:
             data = self.list_of_values_type_3
 
-        return self.compute_expected_values_guess_distribution(data)
+        return self.compute_expected_values_guess_distribution(data,type_x)
 
-
-    def compute_expected_values_guess_distribution(self,data):
-        print("START")
-        #print(data)
-        # TODO find best distribution fit for each dot type based on 11 observations
-        # Set e1 = expected value of each distribution.
-        # HINT: https://stackoverflow.com/questions/6620471/fitting-empirical-distribution-to-theoretical-ones-with-scipy-python?lq=1
+    def compute_expected_values_guess_distribution(self,data,type_x):
+        # TO DO find best distribution fit for each dot type based on 11 observations
+        # Set e1 = expected value of each distribution. Some code / strategy copied from here:
+        # https://stackoverflow.com/questions/6620471/fitting-empirical-distribution-to-theoretical-ones-with-scipy-python?lq=1
         # Distributions to check
-        DISTRIBUTIONS = [
-            st.alpha, st.anglit, st.arcsine, st.beta, st.betaprime, st.bradford, st.burr, st.cauchy, st.chi, st.chi2,
-            st.cosine,
-            st.dgamma, st.dweibull, st.erlang, st.expon, st.exponnorm, st.exponweib, st.exponpow, st.f, st.fatiguelife,
-            st.fisk,
-            st.foldcauchy, st.foldnorm, st.frechet_r, st.frechet_l, st.genlogistic, st.genpareto, st.gennorm,
-            st.genexpon,
-            st.genextreme, st.gausshyper, st.gamma, st.gengamma, st.genhalflogistic, st.gilbrat, st.gompertz,
-            st.gumbel_r,
-            st.gumbel_l, st.halfcauchy, st.halflogistic, st.halfnorm, st.halfgennorm, st.hypsecant, st.invgamma,
-            st.invgauss,
-            st.invweibull, st.johnsonsb, st.johnsonsu, st.ksone, st.kstwobign, st.laplace, st.levy, st.levy_l,
-            st.levy_stable,
-            st.logistic, st.loggamma, st.loglaplace, st.lognorm, st.lomax, st.maxwell, st.mielke, st.nakagami, st.ncx2,
-            st.ncf,
-            st.nct, st.norm, st.pareto, st.pearson3, st.powerlaw, st.powerlognorm, st.powernorm, st.rdist,
-            st.reciprocal,
-            st.rayleigh, st.rice, st.recipinvgauss, st.semicircular, st.t, st.triang, st.truncexpon, st.truncnorm,
-            st.tukeylambda,
-            st.uniform, st.vonmises, st.vonmises_line, st.wald, st.weibull_min, st.weibull_max, st.wrapcauchy
+        # NOT CURRENTLY USING THIS BECAUSE THE TIME CONSTRAINT OF 5 SEC PER TURN.
+
+        DISTRIBUTIONS_1 = [st.alpha, st.anglit, st.arcsine, st.beta, st.betaprime, st.bradford, st.burr, st.cauchy, st.chi, st.chi2]
+        DISTRIBUTIONS_2 = [st.cosine,st.dgamma, st.dweibull, st.erlang, st.expon, st.exponnorm, st.exponweib, st.exponpow, st.f, st.fatiguelife,
+            st.fisk,st.foldcauchy, st.foldnorm]
+        DISTRIBUTIONS_3 = [st.frechet_r, st.frechet_l, st.genlogistic, st.genpareto, st.gennorm,
+            st.genexpon,st.genextreme, st.gausshyper, st.gamma, st.gengamma]
+        DISTRIBUTIONS_4 = [st.genhalflogistic, st.gilbrat, st.gompertz,
+            st.gumbel_r,st.gumbel_l, st.halfcauchy, st.halflogistic]
+        DISTRIBUTIONS_5 = [st.genhalflogistic, st.gilbrat, st.gompertz,
+            st.gumbel_r,st.gumbel_l, st.halfcauchy, st.halflogistic]
+        DISTRIBUTIONS_6 = [st.halfnorm, st.halfgennorm, st.hypsecant, st.invgamma,
+            st.invgauss,st.invweibull, st.johnsonsb, st.johnsonsu, st.ksone]
+        DISTRIBUTIONS_7 = [st.kstwobign, st.laplace, st.levy, st.levy_l,
+            st.levy_stable,st.logistic, st.loggamma, st.loglaplace, st.lognorm, st.lomax]
+        DISTRIBUTIONS_8 = [st.kstwobign, st.laplace, st.levy, st.levy_l,
+            st.levy_stable,st.logistic, st.loggamma]
+        DISTRIBUTIONS_9 = [st.loglaplace, st.lognorm, st.lomax, st.maxwell, st.mielke, st.nakagami, st.ncx2,
+            st.ncf,st.nct, st.norm]
+        DISTRIBUTIONS_10 = [st.pareto, st.pearson3,
+            st.reciprocal,st.rayleigh, st.rice, st.recipinvgauss]
+        DISTRIBUTIONS_11 = [st.semicircular, st.t, st.triang, st.truncexpon, st.truncnorm,
+            st.tukeylambda,st.uniform]
+        DISTRIBUTIONS_12 = [st.vonmises, st.vonmises_line, st.wald, st.weibull_min, st.weibull_max, st.wrapcauchy]
+        ALL_DISTRIBUTIONS = [
+            DISTRIBUTIONS_1,
+            DISTRIBUTIONS_2,
+            DISTRIBUTIONS_3,
+            DISTRIBUTIONS_4,
+            DISTRIBUTIONS_5,
+            DISTRIBUTIONS_6,
+            DISTRIBUTIONS_7,
+            DISTRIBUTIONS_8,
+            DISTRIBUTIONS_9,
+            DISTRIBUTIONS_10,
+            DISTRIBUTIONS_11,
+            DISTRIBUTIONS_12
         ]
         # for testing purposes
-        DISTRIBUTIONS_SHORT = [st.gamma, st.beta,st.rayleigh,st.norm, st.pareto]
+        DISTRIBUTIONS = [st.uniform,st.gamma,st.expon, st.exponnorm,st.lognorm,st.powerlaw, st.powerlognorm, st.powernorm, st.rdist, st.beta,st.rayleigh,st.norm, st.pareto]
 
         # Best holders
-        best_distribution = st.norm
-        best_params = (0.0, 1.0)
-        best_sse = np.inf
+        best_distribution = self.distribution
+        best_params = self.best_params
+        best_sse = self.best_sse
 
         # Estimate distribution parameters from data
         new_expected_value = 0
-        for distribution in DISTRIBUTIONS:
+
+        if type_x is 1:
+            iter = self.dist_iter_1
+            self.dist_iter_1 += 1
+        elif type_x is 2:
+            iter = self.dist_iter_2
+            self.dist_iter_2 += 1
+        elif type_x is 3:
+            iter = self.dist_iter_3
+            self.dist_iter_3 += 1
+        DIST_LIST = ALL_DISTRIBUTIONS[iter%12]
+
+        for distribution in DIST_LIST:
             # Try to fit the distribution
             try:
                 # Ignore warnings from data that can't be fit
@@ -578,6 +635,7 @@ class PacmanController:
                     warnings.simplefilter("ignore")
 
                     params = distribution.fit(data)
+                    #print("distribution %s" % distribution)
                     # Separate parts of parameters
                     arg = params[:-2]
                     loc = params[-2]
@@ -594,16 +652,17 @@ class PacmanController:
                     sse = m.fabs(np.sum(np.power(y - pdf, 2.0)))
 
                     # identify if this distribution is better
-                    sse = 0
+                    #sse = 0
                     if best_sse > sse:
-                        best_distribution = distribution
-                        best_params = params
-                        best_sse = sse
+                        self.distribution= distribution
+                        self.best_params = params
+                        self.best_sse = sse
                         new_expected_value = expected_value
-                        print("updated SSE")
+                        #print("updated SSE")
             except Exception:
                 pass
 
+        #print("best_distribution %s" % self.distribution)
         return new_expected_value
 
     def compute_expected_values_mean(self):
