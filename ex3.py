@@ -5,7 +5,7 @@ import copy as c
 import scipy.stats as st
 import warnings
 import numpy as np
-import pandas as pd
+#import pandas as pd
 import math as m
 ids = ["000000000", "111111111"]
 COLOR_ORDERED = ["blue","green","yellow","red"]
@@ -456,25 +456,25 @@ class PacmanController:
             #print("updated all")
             self.compute_expected_values_mean()
 
-        if len(self.list_of_values_type_1) >= 8:
-
-        #if self.e1_flag and len(self.list_of_values_type_1) == 8:
-            print("updated e1")
-            print(self.list_of_values_type_1)
-            self.e1 = self.compute_expected_values_plus_start(1)
-            self.e1_flag = False
-        if self.e2_flag and len(self.list_of_values_type_2) == 8:
-            print("updated e2")
-            print(self.list_of_values_type_2)
-            self.e1 = self.compute_expected_values_plus_start(2)
-            self.e2_flag = False
-        if self.e3_flag and len(self.list_of_values_type_3) == 8:
-            print("updated e3")
-            print(self.list_of_values_type_3)
-
-            self.e3 = self.compute_expected_values_plus_start(3)
-            self.e3_flag = False
-        
+        # if len(self.list_of_values_type_1) >= 8:
+        #
+        # #if self.e1_flag and len(self.list_of_values_type_1) == 8:
+        #     print("updated e1")
+        #     print(self.list_of_values_type_1)
+        #     self.e1 = self.compute_expected_values_plus_start(1)
+        #     self.e1_flag = False
+        # if self.e2_flag and len(self.list_of_values_type_2) == 8:
+        #     print("updated e2")
+        #     print(self.list_of_values_type_2)
+        #     self.e1 = self.compute_expected_values_plus_start(2)
+        #     self.e2_flag = False
+        # if self.e3_flag and len(self.list_of_values_type_3) == 8:
+        #     print("updated e3")
+        #     print(self.list_of_values_type_3)
+        #
+        #     self.e3 = self.compute_expected_values_plus_start(3)
+        #     self.e3_flag = False
+        #
         # Current PacmanState # we should've use inheritance ;-)
         s_0 = PacmanState(state,self.last_pacman_action,self.e1,self.e2,self.e3)
 
@@ -671,22 +671,37 @@ class PacmanController:
         # v1.0 = return mean inefficiently.
         if self.e1_flag:
             if len(self.list_of_values_type_1)>0:
+                # convert to NumPy type:
+                list_of_type_np = np.array(self.list_of_values_type_1)
+                # estimate the pdf
+                e1_pdf = st.norm.pdf(list_of_type_np, np.mean(list_of_type_np), np.std(list_of_type_np))
                 self.e1 = sum(self.list_of_values_type_1)/len(self.list_of_values_type_1)
+                self.e1 = np.mean(e1_pdf)
             else:
                 self.e1 = max(self.e1,self.e2,self.e3,0)
         if self.e2_flag:
             if len(self.list_of_values_type_2)>0:
+                # convert to NumPy type:
+                list_of_type_np = np.array(self.list_of_values_type_2)
+                # estimate the pdf
+                e2_pdf = st.norm.pdf(list_of_type_np, np.mean(list_of_type_np), np.std(list_of_type_np))
                 self.e2 = sum(self.list_of_values_type_2)/len(self.list_of_values_type_2)
+                self.e2 = np.mean(e2_pdf)
             else:
                 self.e2 = max(self.e1,self.e2,self.e3,0)
         if self.e3_flag:
             if len(self.list_of_values_type_3)>0:
+                # convert to NumPy type:
+                list_of_type_np = np.array(self.list_of_values_type_3)
+                # estimate the pdf
+                e3_pdf = st.norm.pdf(list_of_type_np, np.mean(list_of_type_np), np.std(list_of_type_np))
                 self.e3 = sum(self.list_of_values_type_3)/len(self.list_of_values_type_3)
+                self.e3 = np.mean(e3_pdf)
             else:
                 self.e3 = max(self.e1,self.e2,self.e3,0)
 
         # TO DO: v2.0 guess distribution and return expected value.
-
+        print("estimsted dot means: ", [self.e1, self.e2, self.e3])
         return
 
 
