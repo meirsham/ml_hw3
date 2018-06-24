@@ -667,7 +667,7 @@ class PacmanController:
 
     def compute_expected_values_mean(self):
         # Return expected values for dot 1, dot 2, dot 3
-
+        # TODO once we have the pdf - for every given sample we can calculte the probability for getting a positive number.
         # v1.0 = return mean inefficiently.
         if self.e1_flag:
             if len(self.list_of_values_type_1)>0:
