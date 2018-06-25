@@ -105,7 +105,29 @@ def convert_dictionary_to_tuple(poss_state_dictionary):
 
     return final_list
 
+class DistributionType:
 
+    def __init__(self):
+
+        self.distribution = st.norm
+        self.best_sse = np.inf
+        self.best_params = (0.0, 1.0)
+        self.dist_iter = 0
+        self.list_of_values = []
+        self.exp_value = 1
+        self.flag = False # Did we add a new dot or not.
+
+    def add_dot(self,data):
+        self.list_of_values += [data]
+        return
+
+    def set_flag(self,bool):
+        self.flag = bool
+        return
+    def compute_mean(self):
+        self.exp_value = sum(self.list_of_values)/len(self.list_of_values)
+        self.flag = False
+        return
 class PacmanState:
 
     def __init__(self,board_state,last_pacman_action=None,e1=0,e2=0,e3=0):
@@ -274,6 +296,7 @@ class PacmanState:
 
         next_tile = None
         current_tile_x, current_tile_y = self.special_things["pacman"]
+
         if action == "U":
             next_tile = (current_tile_x - 1, current_tile_y)
         if action == "R":
@@ -382,6 +405,7 @@ class PacmanController:
         # print('COMPLETE init ')
 
         # Keep track of the old value
+        self.state = state  # original state.
         self.last_state_reward = 0
         self.last_type_eaten = 0 #1,2,3, 0 if no dot eaten
         self.list_of_values_type_1 = []
@@ -390,12 +414,6 @@ class PacmanController:
         self.last_pacman_action = None
         self.steps = steps
         self.rounds = 0
-        self.e1=1
-        self.e2=1
-        self.e3=1
-        self.e1_flag = True
-        self.e2_flag = True
-        self.e3_flag = True
         self.last_time_round = 0
 
         self.distribution = st.norm
@@ -408,21 +426,44 @@ class PacmanController:
         self.dist_iter_3 = 0
         self.state = state #original state.
 
+        #new stuff
+        self.type_1 = DistributionType()
+        self.type_2 = DistributionType()
+        self.type_3 = DistributionType()
+
+
 
     def update_expected_value_for_dot_types(self,accumulated_reward):
-        if self.last_pacman_action is "reset":
-            return
+
 
         diff = accumulated_reward - self.last_state_reward
+        print("Difference %s, Last Action %s " % (diff,self.last_pacman_action))
+
+        if self.last_pacman_action is "reset":
+            if diff is -5:
+                return
+            else:
+                diff+=5
 
         if self.last_type_eaten == 1:
+            self.type_1.add_dot(diff)
+            self.type_1.set_flag(True)
+
+
             self.list_of_values_type_1 += [diff]
         elif self.last_type_eaten == 2:
+            self.type_2.add_dot(diff)
+            self.type_2.set_flag(True)
+
             self.list_of_values_type_2 += [diff]
         elif self.last_type_eaten == 3:
+            self.type_3.add_dot(diff)
+            self.type_3.set_flag(True)
+
             self.list_of_values_type_3 += [diff]
 
         self.last_state_reward = accumulated_reward
+
         pass
 
     def choose_next_action(self, state, accumulated_reward):
@@ -445,48 +486,46 @@ class PacmanController:
         self.rounds +=1
         self.steps -= 1
         if self.rounds % 5 ==0:
-            print("e1 %s %s, e2 %s %s, e3 %s %s" % (self.e1, self.e1_flag, self.e2, self.e2_flag, self.e3, self.e3_flag))
+            print("e1 %s %s, e2 %s %s, e3 %s %s" % (self.type_1.exp_value, self.type_1.flag, self.type_2.exp_value, self.type_2.flag,
+                                                    self.type_3.exp_value, self.type_3.flag))
+        # Current PacmanState # we should've use inheritance ;-)
+        s_0 = PacmanState(state, self.last_pacman_action, self.type_1.exp_value, self.type_2.exp_value,
+                          self.type_3.exp_value)
+
+        # If pacman dead - return reset.
+        if "pacman" not in s_0.special_things or s_0.special_things["pacman"] == "dead":
+            self.last_pacman_action = "reset"
+            return self.last_pacman_action
 
         # add value of type of dot to the correct list
         if self.state is not state:
             self.update_expected_value_for_dot_types(accumulated_reward)
 
-        if self.rounds <= 25:
+        # Rules
+        #   if >= 8 dots of a type, so fit for a distribution each time, if we added a new dot.
+        #   if < 8 dots of a type, so compute the mean, if we added a new dot.
 
+        for type in [self.type_1,self.type_2,self.type_3]:
+            if len(type.list_of_values) >= 8 and type.flag:
+                type.exp_value = self.compute_expected_values_plus_new(type)
+                type.set_flag(False)
+
+        if self.rounds <= 25:
+            for type in [self.type_1, self.type_2, self.type_3]:
+                if len(type.list_of_values) < 8 and type.flag:
+
+                    self.compute_expected_values_mean(type)
             #print("updated all")
             self.compute_expected_values_mean()
 
-        # if len(self.list_of_values_type_1) >= 8:
-        #
-        # #if self.e1_flag and len(self.list_of_values_type_1) == 8:
-        #     print("updated e1")
-        #     print(self.list_of_values_type_1)
-        #     self.e1 = self.compute_expected_values_plus_start(1)
-        #     self.e1_flag = False
-        # if self.e2_flag and len(self.list_of_values_type_2) == 8:
-        #     print("updated e2")
-        #     print(self.list_of_values_type_2)
-        #     self.e1 = self.compute_expected_values_plus_start(2)
-        #     self.e2_flag = False
-        # if self.e3_flag and len(self.list_of_values_type_3) == 8:
-        #     print("updated e3")
-        #     print(self.list_of_values_type_3)
-        #
-        #     self.e3 = self.compute_expected_values_plus_start(3)
-        #     self.e3_flag = False
-        #
-        # Current PacmanState # we should've use inheritance ;-)
+                # Current PacmanState # we should've use inheritance ;-)
         s_0 = PacmanState(state,self.last_pacman_action,self.e1,self.e2,self.e3)
-
-        # If pacman dead - return reset.
-        if "pacman" not in s_0.special_things or s_0.special_things["pacman"] == "dead":
-            return "reset"
 
         all_next_round_possible_states = self.get_next_round_states(s_0)
 
         # Find max in all_states
 
-        # second round
+        # Second round
         for each_state in all_next_round_possible_states:
             round_2_states = []
             if each_state.special_things["pacman"] is not "dead":
@@ -502,7 +541,6 @@ class PacmanController:
         # Update action chosen of winning state.
         self.last_pacman_action = state.last_pacman_action
         self.last_type_eaten = state.last_type_eaten
-
         return self.last_pacman_action
 
     def get_next_round_states(self,s_0):
@@ -551,17 +589,11 @@ class PacmanController:
 
         return max_state
 
-    def compute_expected_values_plus_start(self,type_x):
-        if type_x is 1:
-            data = self.list_of_values_type_1
-        elif type_x is 2:
-            data = self.list_of_values_type_2
-        elif type_x is 3:
-            data = self.list_of_values_type_3
+    def compute_expected_values_plus_new(self,type):
+        data = type.list_of_values
+        return self.compute_expected_values_guess_distribution(data,type)
 
-        return self.compute_expected_values_guess_distribution(data,type_x)
-
-    def compute_expected_values_guess_distribution(self,data,type_x):
+    def compute_expected_values_guess_distribution(self,data,type):
         # TO DO find best distribution fit for each dot type based on 11 observations
         # Set e1 = expected value of each distribution. Some code / strategy copied from here:
         # https://stackoverflow.com/questions/6620471/fitting-empirical-distribution-to-theoretical-ones-with-scipy-python?lq=1
@@ -608,23 +640,17 @@ class PacmanController:
         DISTRIBUTIONS = [st.uniform,st.gamma,st.expon, st.exponnorm,st.lognorm,st.powerlaw, st.powerlognorm, st.powernorm, st.rdist, st.beta,st.rayleigh,st.norm, st.pareto]
 
         # Best holders
-        best_distribution = self.distribution
-        best_params = self.best_params
-        best_sse = self.best_sse
+
+        best_distribution = type.distribution
+        best_params = type.best_params
+        best_sse = type.best_sse
 
         # Estimate distribution parameters from data
         new_expected_value = 0
 
-        if type_x is 1:
-            iter = self.dist_iter_1
-            self.dist_iter_1 += 1
-        elif type_x is 2:
-            iter = self.dist_iter_2
-            self.dist_iter_2 += 1
-        elif type_x is 3:
-            iter = self.dist_iter_3
-            self.dist_iter_3 += 1
-        DIST_LIST = ALL_DISTRIBUTIONS[iter%12]
+        type.dist_iter+=1
+
+        DIST_LIST = ALL_DISTRIBUTIONS[type.dist_iter%12]
 
         for distribution in DIST_LIST:
             # Try to fit the distribution
@@ -654,16 +680,20 @@ class PacmanController:
                     # identify if this distribution is better
                     #sse = 0
                     if best_sse > sse:
-                        self.distribution= distribution
-                        self.best_params = params
-                        self.best_sse = sse
-                        new_expected_value = expected_value
+                        type.distribution= distribution
+                        type.best_params = params
+                        type.best_sse = sse
+                        type.exp_value = expected_value
                         #print("updated SSE")
             except Exception:
                 pass
 
         #print("best_distribution %s" % self.distribution)
         return new_expected_value
+
+    def compute_expected_values_mean(self,type):
+        if len(type.list_of_values)>0:
+            type.compute_mean()
 
     def compute_expected_values_mean(self):
         # Return expected values for dot 1, dot 2, dot 3
