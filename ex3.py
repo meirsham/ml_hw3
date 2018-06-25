@@ -5,7 +5,7 @@ import copy as c
 import scipy.stats as st
 import warnings
 import numpy as np
-import pandas as pd
+#import pandas as pd
 import math as m
 ids = ["000000000", "111111111"]
 COLOR_ORDERED = ["blue","green","yellow","red"]
@@ -515,7 +515,11 @@ class PacmanController:
                 if len(type.list_of_values) < 8 and type.flag:
 
                     self.compute_expected_values_mean(type)
+            #print("updated all")
+            self.compute_expected_values_mean()
 
+                # Current PacmanState # we should've use inheritance ;-)
+        s_0 = PacmanState(state,self.last_pacman_action,self.e1,self.e2,self.e3)
 
         all_next_round_possible_states = self.get_next_round_states(s_0)
 
@@ -690,6 +694,46 @@ class PacmanController:
     def compute_expected_values_mean(self,type):
         if len(type.list_of_values)>0:
             type.compute_mean()
+
+    def compute_expected_values_mean(self):
+        # Return expected values for dot 1, dot 2, dot 3
+        # TODO once we have the pdf - for every given sample we can calculte the probability for getting a positive number.
+        # v1.0 = return mean inefficiently.
+        if self.e1_flag:
+            if len(self.list_of_values_type_1)>0:
+                # convert to NumPy type:
+                list_of_type_np = np.array(self.list_of_values_type_1)
+                # estimate the pdf
+                e1_pdf = st.norm.pdf(list_of_type_np, np.mean(list_of_type_np), np.std(list_of_type_np))
+                self.e1 = sum(self.list_of_values_type_1)/len(self.list_of_values_type_1)
+                self.e1 = np.mean(e1_pdf)
+            else:
+                self.e1 = max(self.e1,self.e2,self.e3,0)
+        if self.e2_flag:
+            if len(self.list_of_values_type_2)>0:
+                # convert to NumPy type:
+                list_of_type_np = np.array(self.list_of_values_type_2)
+                # estimate the pdf
+                e2_pdf = st.norm.pdf(list_of_type_np, np.mean(list_of_type_np), np.std(list_of_type_np))
+                self.e2 = sum(self.list_of_values_type_2)/len(self.list_of_values_type_2)
+                self.e2 = np.mean(e2_pdf)
+            else:
+                self.e2 = max(self.e1,self.e2,self.e3,0)
+        if self.e3_flag:
+            if len(self.list_of_values_type_3)>0:
+                # convert to NumPy type:
+                list_of_type_np = np.array(self.list_of_values_type_3)
+                # estimate the pdf
+                e3_pdf = st.norm.pdf(list_of_type_np, np.mean(list_of_type_np), np.std(list_of_type_np))
+                self.e3 = sum(self.list_of_values_type_3)/len(self.list_of_values_type_3)
+                self.e3 = np.mean(e3_pdf)
+            else:
+                self.e3 = max(self.e1,self.e2,self.e3,0)
+
+        # TO DO: v2.0 guess distribution and return expected value.
+        print("estimsted dot means: ", [self.e1, self.e2, self.e3])
+        return
+
 
 
 
