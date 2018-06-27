@@ -206,7 +206,10 @@ class Evaluator:
             if self.state[next_tile] == 77:
                 self.state[next_tile] = 10
             else:
-                self.state[next_tile] = 10 + previous_tile_pill_number
+                # before bug fix
+                #self.state[next_tile] = 10 + previous_tile_pill_number
+                # after bug fix
+                self.state[next_tile] = 10 + (self.state[next_tile] % 10)
             del self.special_things[color]
 
         # ghost got the pacman
@@ -299,7 +302,7 @@ if __name__ == '__main__':
          {"11": create_uniform_probability(0.5, 2), "12": create_exponential_probability(1.5),
           "13": create_exponential_probability(1.7)},
          {"red": 0.9, "green": 0.7, "blue": 0.4, "yellow": 0.4},
-         ()),
+         ()),)
     
     problems2 = (
 
