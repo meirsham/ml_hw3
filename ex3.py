@@ -166,7 +166,7 @@ class PacmanState:
         # Check left of pacman for sensors
         queue = [[new_x,new_y]]
         j=0
-        while j < 3:
+        while j < 3 and len(queue) > 0:
             new_x,new_y=queue.pop()
             # left
             ul = [new_x-1,new_y-1]
@@ -408,9 +408,6 @@ class PacmanController:
         self.state = state  # original state.
         self.last_state_reward = 0
         self.last_type_eaten = 0 #1,2,3, 0 if no dot eaten
-        self.list_of_values_type_1 = []
-        self.list_of_values_type_2 = []
-        self.list_of_values_type_3 = []
         self.last_pacman_action = None
         self.steps = steps
         self.rounds = 0
@@ -418,12 +415,6 @@ class PacmanController:
 
         self.distribution = st.norm
         # Need to create different distributions for each type of ball. {1: st.norm, 2: st.norm, 3: st.norm}
-        self.best_sse = np.inf
-        self.best_params = (0.0, 1.0)
-        self.dist_iter_1 = 0
-
-        self.dist_iter_2 = 0
-        self.dist_iter_3 = 0
         self.state = state #original state.
 
         #new stuff
@@ -432,10 +423,12 @@ class PacmanController:
         self.type_3 = DistributionType()
 
 
-
+    def get_type_lists(self):
+        print(self.type_1.list_of_values)
+        print(self.type_2.list_of_values)
+        print(self.type_3.list_of_values)
+        return
     def update_expected_value_for_dot_types(self,accumulated_reward):
-
-
         diff = accumulated_reward - self.last_state_reward
         print("Difference %s, Last Action %s " % (diff,self.last_pacman_action))
 
@@ -450,17 +443,13 @@ class PacmanController:
             self.type_1.set_flag(True)
 
 
-            self.list_of_values_type_1 += [diff]
         elif self.last_type_eaten == 2:
             self.type_2.add_dot(diff)
             self.type_2.set_flag(True)
 
-            self.list_of_values_type_2 += [diff]
         elif self.last_type_eaten == 3:
             self.type_3.add_dot(diff)
             self.type_3.set_flag(True)
-
-            self.list_of_values_type_3 += [diff]
 
         self.last_state_reward = accumulated_reward
 
@@ -507,19 +496,24 @@ class PacmanController:
 
         for type in [self.type_1,self.type_2,self.type_3]:
             if len(type.list_of_values) >= 8 and type.flag:
-                type.exp_value = self.compute_expected_values_plus_new(type)
+                self.compute_expected_values_plus_new(type)
                 type.set_flag(False)
 
+
         if self.rounds <= 25:
+
             for type in [self.type_1, self.type_2, self.type_3]:
-                if len(type.list_of_values) < 8 and type.flag:
+
+
+                if len(type.list_of_values) > 4 and len(type.list_of_values) < 8 and type.flag:
 
                     self.compute_expected_values_mean(type)
-            #print("updated all")
-            self.compute_expected_values_mean()
+
+                #print("updated all")
+            #self.compute_expected_values_mean()
 
                 # Current PacmanState # we should've use inheritance ;-)
-        s_0 = PacmanState(state,self.last_pacman_action,self.e1,self.e2,self.e3)
+        s_0 = PacmanState(state,self.last_pacman_action,self.type_1.exp_value,self.type_1.exp_value,self.type_1.exp_value)
 
         all_next_round_possible_states = self.get_next_round_states(s_0)
 
@@ -591,7 +585,8 @@ class PacmanController:
 
     def compute_expected_values_plus_new(self,type):
         data = type.list_of_values
-        return self.compute_expected_values_guess_distribution(data,type)
+        self.compute_expected_values_guess_distribution(data,type)
+        return
 
     def compute_expected_values_guess_distribution(self,data,type):
         # TO DO find best distribution fit for each dot type based on 11 observations
@@ -639,15 +634,7 @@ class PacmanController:
         # for testing purposes
         DISTRIBUTIONS = [st.uniform,st.gamma,st.expon, st.exponnorm,st.lognorm,st.powerlaw, st.powerlognorm, st.powernorm, st.rdist, st.beta,st.rayleigh,st.norm, st.pareto]
 
-        # Best holders
-
-        best_distribution = type.distribution
-        best_params = type.best_params
-        best_sse = type.best_sse
-
         # Estimate distribution parameters from data
-        new_expected_value = 0
-
         type.dist_iter+=1
 
         DIST_LIST = ALL_DISTRIBUTIONS[type.dist_iter%12]
@@ -667,7 +654,6 @@ class PacmanController:
                     loc = params[-2]
                     scale = params[-1]
 
-                    expected_value = distribution.expect(None,arg,loc,scale)
                     # Get histogram of original data
                     y, x = np.histogram(data, bins=10, density=True)
                     x = (x + np.roll(x, -1))[:-1] / 2.0
@@ -679,22 +665,22 @@ class PacmanController:
 
                     # identify if this distribution is better
                     #sse = 0
-                    if best_sse > sse:
+                    if type.best_sse > sse:
                         type.distribution= distribution
                         type.best_params = params
                         type.best_sse = sse
-                        type.exp_value = expected_value
-                        #print("updated SSE")
+                        type.exp_value = distribution.expect(None,arg,loc,scale)
+
             except Exception:
                 pass
 
         #print("best_distribution %s" % self.distribution)
-        return new_expected_value
+        return
 
     def compute_expected_values_mean(self,type):
         if len(type.list_of_values)>0:
             type.compute_mean()
-
+    """
     def compute_expected_values_mean(self):
         # Return expected values for dot 1, dot 2, dot 3
         # TODO once we have the pdf - for every given sample we can calculte the probability for getting a positive number.
@@ -733,7 +719,7 @@ class PacmanController:
         # TO DO: v2.0 guess distribution and return expected value.
         print("estimsted dot means: ", [self.e1, self.e2, self.e3])
         return
-
+    """
 
 
 

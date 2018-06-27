@@ -49,13 +49,10 @@ We can add additional densities! Don't assume we'll use only those four!
 
 def problem_to_state(problem):
     """
-
     Args:
         problem: pacman problem as tuple of tuples, as described in PDF
-
     Returns: internal state representation, as dictionary of {coordinate: code} and
     dictionary of objects of special interest (pacman, ghosts, poison) as {name: coordinate}
-
     """
     state_to_return = {}
     special_things = {"poison": []}
@@ -259,7 +256,8 @@ class Evaluator:
 
 if __name__ == '__main__':
     problems = (
-      ((
+
+        ((
              (99, 99, 99, 99, 99, 99, 99),
              (99, 13, 12, 66, 12, 13, 99),
              (99, 11, 11, 11, 11, 11, 99),
@@ -285,7 +283,6 @@ if __name__ == '__main__':
          {"red": 0.9, "green": 0.7, "blue": 0.4, "yellow": 0.4},
          ()),
 
-
         ((
          (99, 99, 99, 99, 99, 99, 99),
          (99, 11, 11, 66, 11, 11, 99),
@@ -300,7 +297,23 @@ if __name__ == '__main__':
           "13": create_exponential_probability(1.7)},
          {"red": 0.9, "green": 0.7, "blue": 0.4, "yellow": 0.4},
          ()),
-    
+
+
+        ((
+             (99, 99, 99, 99, 99, 99, 99),
+             (99, 11, 11, 66, 11, 11, 99),
+             (99, 11, 11, 11, 11, 11, 99),
+             (99, 12, 12, 73, 13, 13, 99),
+             (99, 12, 12, 13, 13, 13, 99),
+             (99, 12, 12, 53, 13, 13, 99),
+             (99, 99, 99, 99, 99, 99, 99),
+         ),
+         30,
+         {"11": create_uniform_probability(0.1, 0.5), "12": create_normal_probability(-1, 0.2),
+          "13": create_exponential_probability(0.7)},
+         {"red": 0.5, "green": 0.1, "blue": 0.1, "yellow": 0.1},
+         ("red",)),
+    )
     problems2 = (
 
         ((
@@ -326,4 +339,3 @@ if __name__ == '__main__':
 
     for number, result in enumerate(results):
         print("the result for input", number + 1, "is", result)
-
