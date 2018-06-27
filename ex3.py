@@ -386,13 +386,13 @@ class PacmanState:
         next_tile = None
         if "pacman" in self.special_things and self.special_things["pacman"] != "dead":
             current_tile_x, current_tile_y = self.special_things["pacman"]
-            for num_of_steps in range(0,):
+            for num_of_steps in range(0,10):
                 #current_tile_x, current_tile_y = self.special_things["pacman"]
                 [estimated_reward, current_tile_x, current_tile_y] = self.estimate_best_path_rewrad(estimated_reward, current_tile_x, current_tile_y)
 
         self.exp_value_nearby = self.get_dot_neighbors()
 
-        self.h_val = 10*self.score - 10*self.numb_of_ghosts**2 + self.exp_value_nearby + estimated_reward   #new value
+        self.h_val = 10*self.score - 10*self.numb_of_ghosts**2 + self.exp_value_nearby + 10*estimated_reward   #new value
 
 
         pass
@@ -424,26 +424,26 @@ class PacmanState:
                     cur_md = abs(next_tile[0]-cell_dot[0]) + abs(next_tile[1]-cell_dot[1])
                     if cur_md < min_md :
                         min_md = cur_md
-                        possible_reward = self.whats_next(next_tile)
+                        possible_reward = self.whats_next(next_tile, self.e1)
                 elif self.state[cell_dot] == 12 and self.e2 > 0:
                     cur_md = abs(next_tile[0]-cell_dot[0]) + abs(next_tile[1]-cell_dot[1])
                     if cur_md < min_md :
                         min_md = cur_md
-                        possible_reward = self.whats_next(next_tile)
+                        possible_reward = self.whats_next(next_tile, self.e2)
                 elif self.state[cell_dot] == 13 and self.e3 > 0:
                     cur_md = abs(next_tile[0]-cell_dot[0]) + abs(next_tile[1]-cell_dot[1])
                     if cur_md < min_md :
                         min_md = cur_md
-                        possible_reward = self.whats_next(next_tile)
+                        possible_reward = self.whats_next(next_tile, self.e3)
 
         estimated_reward+=possible_reward
         return [estimated_reward, next_tile[0], next_tile[1]]
 
-    def whats_next(self, next_tile):
+    def whats_next(self, next_tile, dot_val):
         if self.state[next_tile] == 10:
             return 0
         else:
-            return 1
+            return dot_val
 
     def get_possible_moves(self,special_thing):
         # pacman is alive and cannot move into a wall or a ghost or a poison!
