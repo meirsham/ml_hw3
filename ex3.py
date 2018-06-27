@@ -202,7 +202,7 @@ class PacmanState:
                     exp_value += self.e2
                 elif self.state[item[0], item[1]] is 13:
                     exp_value += self.e3
-                elif self.state[item[0], item[1]] in checker.COLOR_CODES.values():
+                elif self.state[item[0], item[1]] in checker.BLOCKING_CODES:
                     #exp_value -= 2.5 /self.dist_to_pacman(item,[new_x,new_y])
                     printable = 2.5 /self.dist_to_pacman(item,[new_x,new_y])
                     #print(printable)
@@ -227,7 +227,7 @@ class PacmanState:
                     exp_value += self.e2
                 elif self.state[item[0], item[1]] is 13:
                     exp_value += self.e3
-                elif self.state[item[0], item[1]] in checker.COLOR_CODES.values():
+                elif self.state[item[0], item[1]] in checker.BLOCKING_CODES:
                     exp_value -= 2.5 / self.dist_to_pacman(item, pacman)
 
             if flag:
@@ -241,7 +241,7 @@ class PacmanState:
                 exp_value += self.e2
             elif self.state[u[0], u[1]] is 13:
                 exp_value += self.e3
-            elif self.state[item[0], item[1]] in checker.COLOR_CODES.values():
+            elif self.state[item[0], item[1]] in checker.BLOCKING_CODES:
                 exp_value -= 2.5 / self.dist_to_pacman(item,pacman)
 
             if self.state[u[0],u[1]] is not 99:

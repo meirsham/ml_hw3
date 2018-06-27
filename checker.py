@@ -368,7 +368,7 @@ if __name__ == '__main__':
 
     results = []
 
-    for problem, num_of_steps, pill_rewards_dict, ghost_movement_probabilities, diagonal_moving in problems2:
+    for problem, num_of_steps, pill_rewards_dict, ghost_movement_probabilities, diagonal_moving in problems:
         my_eval = Evaluator(ex3.PacmanController(problem, num_of_steps), problem, num_of_steps,
                             pill_rewards_dict, ghost_movement_probabilities, diagonal_moving)
         print("new problem Daniel")
