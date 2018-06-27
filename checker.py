@@ -236,10 +236,12 @@ class Evaluator:
         for step in range(self.steps):
             #print(self.state_to_agent()[1])
             action = self.agent.choose_next_action(self.state_to_agent()[0], self.state_to_agent()[1])
+            if action is "reset":
+                print("Oh no, i died")
             if not is_action_legal(action):
                 raise Exception("illegal action!", action, "happened at step number:", step)
             self.change_state_after_action(action)
-            utils.print_table(self.state_to_agent()[0])
+            #utils.print_table(self.state_to_agent()[0])
         return self.accumulated_reward
 
     def move_pacman_to_walkable_tile(self, current_tile, next_tile):
@@ -313,25 +315,60 @@ if __name__ == '__main__':
           "13": create_exponential_probability(0.7)},
          {"red": 0.5, "green": 0.1, "blue": 0.1, "yellow": 0.1},
          ("red",)),
+        ((
+             (99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99),
+             (99, 11, 11, 66, 11, 11, 11, 11, 11, 11, 11, 11, 99),
+             (99, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 99),
+             (99, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 99),
+             (99, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 99),
+             (99, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 99),
+             (99, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 99),
+             (99, 13, 13, 13, 13, 13, 13, 13, 33, 13, 13, 13, 99),
+             (99, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 99),
+             (99, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 99),
+             (99, 11, 12, 13, 11, 12, 13, 11, 12, 13, 12, 12, 99),
+             (99, 11, 12, 13, 11, 12, 13, 11, 12, 13, 13, 13, 99),
+             (99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99),
+
+         ),
+         30,
+         {"11": create_uniform_probability(0.1, 0.5), "12": create_normal_probability(-1, 0.2),
+          "13": create_exponential_probability(0.7)},
+         {"red": 0.5, "green": 0.1, "blue": 0.1, "yellow": 0.1},
+         ("red",)),
     )
     problems2 = (
 
         ((
-             (99, 99, 99, 99, 99, 99, 99),
-             (99, 13, 12, 66, 12, 13, 99),
-             (99, 11, 11, 11, 11, 11, 99),
-             (99, 12, 12, 11, 13, 33, 99),
-             (99, 99, 99, 99, 99, 99, 99),
+             (99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99),
+             (99, 11, 11, 66, 11, 11, 11, 11, 11, 11, 11, 11, 99),
+             (99, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 99),
+             (99, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 99),
+             (99, 11, 11, 11, 71, 71, 71, 71, 99, 99, 99, 13, 99),
+             (99, 11, 33, 11, 11, 11, 11, 11, 11, 11, 11, 11, 99),
+             (99, 12, 12, 12, 12, 71, 71, 71, 12, 12, 12, 12, 99),
+             (99, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 99),
+             (99, 12, 12, 12, 33, 12, 12, 12, 53, 12, 12, 12, 99),
+             (99, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 99),
+             (99, 11, 12, 13, 11, 12, 13, 11, 12, 13, 12, 12, 99),
+             (99, 13, 13, 99, 13, 13, 13, 13, 13, 13, 13, 13, 99),
+             (99, 11, 12, 99, 11, 12, 13, 11, 12, 13, 12, 12, 99),
+             (99, 13, 13, 99, 13, 13, 13, 13, 13, 13, 13, 13, 99),
+             (99, 11, 12, 99, 11, 12, 99, 11, 12, 13, 12, 12, 99),
+             (99, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 99),
+             (99, 11, 12, 42, 11, 12, 13, 11, 12, 13, 12, 12, 99),
+             (99, 11, 12, 13, 11, 12, 13, 11, 12, 13, 13, 13, 99),
+             (99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99),
          ),
          75,
-         {"11": create_uniform_probability(0.5, 2), "12": create_exponential_probability(1.5),
+         {"11": create_uniform_probability(0,0.2), "12": create_exponential_probability(1.5),
           "13": create_exponential_probability(1.7)},
          {"red": 0.9, "green": 0.7, "blue": 0.4, "yellow": 0.4},
          ()),)
 
     results = []
 
-    for problem, num_of_steps, pill_rewards_dict, ghost_movement_probabilities, diagonal_moving in problems2:
+    for problem, num_of_steps, pill_rewards_dict, ghost_movement_probabilities, diagonal_moving in problems:
         my_eval = Evaluator(ex3.PacmanController(problem, num_of_steps), problem, num_of_steps,
                             pill_rewards_dict, ghost_movement_probabilities, diagonal_moving)
         print("new problem Daniel")

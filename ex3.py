@@ -4,6 +4,7 @@ import checker
 import copy as c
 import scipy.stats as st
 import warnings
+
 import numpy as np
 #import pandas as pd
 import math as m
@@ -107,7 +108,7 @@ def convert_dictionary_to_tuple(poss_state_dictionary):
 
 class DistributionType:
 
-    def __init__(self):
+    def __init__(self,dot_count):
 
         self.distribution = st.norm
         self.best_sse = np.inf
@@ -116,7 +117,8 @@ class DistributionType:
         self.list_of_values = []
         self.exp_value = 1
         self.flag = False # Did we add a new dot or not.
-
+        self.dot_count = dot_count # number of dots of this type on board
+        self.N = max(10,dot_count*0.10)
     def add_dot(self,data):
         self.list_of_values += [data]
         return
@@ -130,7 +132,7 @@ class DistributionType:
         return
 class PacmanState:
 
-    def __init__(self,board_state,last_pacman_action=None,e1=0,e2=0,e3=0):
+    def __init__(self,board_state,last_pacman_action="reset",e1=0,e2=0,e3=0):
         # board
         self.state, self.special_things = checker.problem_to_state(board_state)
         self.size_of_board = len(self.state)
@@ -140,12 +142,12 @@ class PacmanState:
         self.h_val = 0
         self.future_h_val = 0
         self.numb_of_ghosts = self.get_num_ghosts()
-        self.numb_of_dots_within_three = self.get_dot_neighbors()
-        self.numb_of_dots_div_board_size = self.numb_of_dots_within_three/self.size_of_board
         # Expected Values for each type of dot
         self.e1=e1
         self.e2=e2
         self.e3=e3
+        self.numb_of_dots_within_three = self.get_dot_neighbors()
+        self.numb_of_dots_div_board_size = self.numb_of_dots_within_three / self.size_of_board
 
     def get_size_of_board(self):
         len(self.state)
@@ -157,17 +159,29 @@ class PacmanState:
                 i+=1
         return i
 
+    def dist_to_pacman(self,item, pacman):
+        a = item[0]
+        b = item[1]
+        x = pacman[0]
+        y = pacman[1]
+        md = m.fabs(a-x)+m.fabs(b-y)
+        return md
+
     def get_dot_neighbors(self):
-        count = 0
+        exp_value = 0
+        explored_squares = 0
         if "pacman" not in self.special_things or self.special_things["pacman"] is "dead":
             return -10
-
         new_x,new_y= self.special_things["pacman"]
+
+        pacman = (new_x, new_y)
+
         # Check left of pacman for sensors
         queue = [[new_x,new_y]]
         j=0
-        while j < 3 and len(queue) > 0:
+        while j < 4 and len(queue) > 0:
             new_x,new_y=queue.pop()
+            explored_squares+=1
             # left
             ul = [new_x-1,new_y-1]
             l = [new_x,new_y-1]
@@ -182,8 +196,17 @@ class PacmanState:
                 if val == 99:
                     flag = False
 
-                elif self.state[item[0],item[1]] in (11, 12, 13):
-                    count += 1
+                elif self.state[item[0],item[1]] is 11:
+                    exp_value += self.e1
+                elif self.state[item[0], item[1]] is 12:
+                    exp_value += self.e2
+                elif self.state[item[0], item[1]] is 13:
+                    exp_value += self.e3
+                elif self.state[item[0], item[1]] in checker.BLOCKING_CODES:
+                    #exp_value -= 2.5 /self.dist_to_pacman(item,[new_x,new_y])
+                    printable = 2.5 /self.dist_to_pacman(item,[new_x,new_y])
+                    #print(printable)
+                    exp_value-=printable
             if flag:
                 queue.append(l)
 
@@ -198,28 +221,48 @@ class PacmanState:
                 val = self.state[item[0],item[1]]
                 if val == 99:
                     flag = False
+                elif self.state[item[0], item[1]] is 11:
+                    exp_value += self.e1
+                elif self.state[item[0], item[1]] is 12:
+                    exp_value += self.e2
+                elif self.state[item[0], item[1]] is 13:
+                    exp_value += self.e3
+                elif self.state[item[0], item[1]] in checker.BLOCKING_CODES:
+                    exp_value -= 2.5 / self.dist_to_pacman(item, pacman)
 
-                elif self.state[item[0],item[1]] in (11, 12, 13):
-                    count += 1
             if flag:
                 queue.append(r)
 
 
             u = [new_x-1,new_y]
-            if self.state[u[0],u[1]] in (11,12,13):
-                count+=1
+            if self.state[u[0], u[1]] is 11:
+                exp_value += self.e1
+            elif self.state[u[0], u[1]] is 12:
+                exp_value += self.e2
+            elif self.state[u[0], u[1]] is 13:
+                exp_value += self.e3
+            elif self.state[item[0], item[1]] in checker.BLOCKING_CODES:
+                exp_value -= 2.5 / self.dist_to_pacman(item,pacman)
+
             if self.state[u[0],u[1]] is not 99:
                 queue.append(u)
 
             d = [new_x,new_y+1]
-            if self.state[d[0],d[1]] in (11, 12, 13):
-                count += 1
+            if self.state[d[0], d[1]] is 11:
+                exp_value += self.e1
+            elif self.state[d[0], d[1]] is 12:
+                exp_value += self.e2
+            elif self.state[d[0], d[1]] is 13:
+                exp_value += self.e3
+            elif self.state[item[0], item[1]] in checker.COLOR_CODES:
+                exp_value -= 3 * 1 / self.dist_to_pacman(item, pacman)
+
             if self.state[d[0],d[1]] is not 99:
                 queue.append(d)
 
             j+=1
 
-        return count
+        return exp_value/max(9,explored_squares)
 
     def move_pacman_to_walkable_tile(self, current_tile, next_tile):
         if self.state[next_tile] == 11:
@@ -333,10 +376,11 @@ class PacmanState:
         # The function doesn't return anything.
         # for example, h_val = score - (# of ghosts remaining)^2
         # md to nearest dot
-        self.numb_of_dots_within_three = self.get_dot_neighbors()
-        self.numb_of_dots_div_board_size = self.numb_of_dots_within_three/self.size_of_board
+        self.exp_value_nearby = self.get_dot_neighbors()
 
-        self.h_val = 10*self.score-5*self.numb_of_ghosts**2 + 2*self.numb_of_dots_div_board_size  #new value
+
+        self.h_val = 10*self.score - 10*self.numb_of_ghosts**2 + self.exp_value_nearby   #new value
+
 
         pass
 
@@ -416,12 +460,25 @@ class PacmanController:
         self.distribution = st.norm
         # Need to create different distributions for each type of ball. {1: st.norm, 2: st.norm, 3: st.norm}
         self.state = state #original state.
+        self.dots_count = self.eval_dots()
+        print(self.dots_count)
 
         #new stuff
-        self.type_1 = DistributionType()
-        self.type_2 = DistributionType()
-        self.type_3 = DistributionType()
+        self.type_1 = DistributionType(self.dots_count[1])
+        self.type_2 = DistributionType(self.dots_count[2])
+        self.type_3 = DistributionType(self.dots_count[3])
 
+    def eval_dots(self):
+        values = list(self.state)
+        d = {1:0,2:0,3:0}
+        for i in values:
+            for j in i:
+                value = j%10
+
+                if value < 4:
+
+                    d[value]+=1
+        return d
 
     def get_type_lists(self):
         print(self.type_1.list_of_values)
@@ -430,12 +487,13 @@ class PacmanController:
         return
     def update_expected_value_for_dot_types(self,accumulated_reward):
         diff = accumulated_reward - self.last_state_reward
-        print("Difference %s, Last Action %s " % (diff,self.last_pacman_action))
+        #print("Difference %s, Last Action %s " % (diff,self.last_pacman_action))
 
         if self.last_pacman_action is "reset":
             if diff is -5:
                 return
             else:
+                # adds 5 to get the real value of the dot.
                 diff+=5
 
         if self.last_type_eaten == 1:
@@ -455,8 +513,19 @@ class PacmanController:
 
         pass
 
+    def print_the_type_summary(self):
+        print(self.type_1.distribution, self.type_1.exp_value, self.type_1.list_of_values)
+        print(self.type_2.distribution, self.type_2.exp_value, self.type_2.list_of_values)
+        print(self.type_3.distribution, self.type_3.exp_value, self.type_3.list_of_values)
+        print()
+        print(self.dots_count)
+        return
+
     def choose_next_action(self, state, accumulated_reward):
-        # TO DO: MUST ADD TIMER EFFECT
+
+        self.steps -= 1
+        if self.steps<1:
+            self.print_the_type_summary()
 
         if self.rounds is 0:
             self.last_time_round=time.time()
@@ -465,7 +534,7 @@ class PacmanController:
             temp_time = time.time()
             diff = temp_time-self.last_time_round
             self.last_time_round = temp_time
-        print("Round %s, Time: %s, length: %s " % (self.rounds, time.time(), diff))
+        #print("Round %s, Time: %s, length: %s " % (self.rounds, time.time(), diff))
         """Choose next action for pacman controller given the current state.
             Action should be returned in the format described previous parts of the project.
             This method MUST terminate within the specified timeout (5 seconds)
@@ -473,11 +542,10 @@ class PacmanController:
 
         # decrease step count
         self.rounds +=1
-        self.steps -= 1
-        if self.rounds % 5 ==0:
-            print("e1 %s %s, e2 %s %s, e3 %s %s" % (self.type_1.exp_value, self.type_1.flag, self.type_2.exp_value, self.type_2.flag,
-                                                    self.type_3.exp_value, self.type_3.flag))
-        # Current PacmanState # we should've use inheritance ;-)
+        # if self.rounds % 5 ==0:
+        #     print("e1 %s %s, e2 %s %s, e3 %s %s" % (self.type_1.exp_value, self.type_1.flag, self.type_2.exp_value, self.type_2.flag,
+        #                                             self.type_3.exp_value, self.type_3.flag))
+        # # Current PacmanState # we should've use inheritance ;-)
         s_0 = PacmanState(state, self.last_pacman_action, self.type_1.exp_value, self.type_2.exp_value,
                           self.type_3.exp_value)
 
@@ -495,15 +563,14 @@ class PacmanController:
         #   if < 8 dots of a type, so compute the mean, if we added a new dot.
 
         for type in [self.type_1,self.type_2,self.type_3]:
-            if len(type.list_of_values) >= 8 and type.flag:
+            # N = max(10, 10 % of the type of dots on the board)
+            if len(type.list_of_values) >= type.N and type.flag:
                 self.compute_expected_values_plus_new(type)
                 type.set_flag(False)
 
-
-        if self.rounds <= 25:
+        if self.rounds <= 100:
 
             for type in [self.type_1, self.type_2, self.type_3]:
-
 
                 if len(type.list_of_values) > 4 and len(type.list_of_values) < 8 and type.flag:
 
@@ -531,9 +598,11 @@ class PacmanController:
         # Find max "future_h_value"
 
         state = self.find_max_future_h_value(list(all_next_round_possible_states))
-
-        # Update action chosen of winning state.
-        self.last_pacman_action = state.last_pacman_action
+        if state:
+            # Update action chosen of winning state.
+            self.last_pacman_action = state.last_pacman_action
+        else:
+            return "reset"
         self.last_type_eaten = state.last_type_eaten
         return self.last_pacman_action
 
@@ -612,33 +681,37 @@ class PacmanController:
             st.levy_stable,st.logistic, st.loggamma]
         DISTRIBUTIONS_9 = [st.loglaplace, st.lognorm, st.lomax, st.maxwell, st.mielke, st.nakagami, st.ncx2,
             st.ncf,st.nct, st.norm]
-        DISTRIBUTIONS_10 = [st.pareto, st.pearson3,
-            st.reciprocal,st.rayleigh, st.rice, st.recipinvgauss]
-        DISTRIBUTIONS_11 = [st.semicircular, st.t, st.triang, st.truncexpon, st.truncnorm,
-            st.tukeylambda,st.uniform]
-        DISTRIBUTIONS_12 = [st.vonmises, st.vonmises_line, st.wald, st.weibull_min, st.weibull_max, st.wrapcauchy]
-        ALL_DISTRIBUTIONS = [
-            DISTRIBUTIONS_1,
-            DISTRIBUTIONS_2,
-            DISTRIBUTIONS_3,
-            DISTRIBUTIONS_4,
-            DISTRIBUTIONS_5,
-            DISTRIBUTIONS_6,
-            DISTRIBUTIONS_7,
-            DISTRIBUTIONS_8,
-            DISTRIBUTIONS_9,
-            DISTRIBUTIONS_10,
-            DISTRIBUTIONS_11,
-            DISTRIBUTIONS_12
-        ]
-        # for testing purposes
-        DISTRIBUTIONS = [st.uniform,st.gamma,st.expon, st.exponnorm,st.lognorm,st.powerlaw, st.powerlognorm, st.powernorm, st.rdist, st.beta,st.rayleigh,st.norm, st.pareto]
+        #DISTRIBUTIONS_10 = [st.pareto, st.pearson3,st.reciprocal,st.rayleigh, st.rice, st.recipinvgauss]
+        #DISTRIBUTIONS_11 = [st.semicircular, st.t, st.triang, st.truncexpon, st.truncnorm,st.tukeylambda,st.uniform]
+        #DISTRIBUTIONS_12 = [st.vonmises, st.vonmises_line, st.wald, st.weibull_min, st.weibull_max, st.wrapcauchy]
+        # ALL_DISTRIBUTIONS = [
+        #     DISTRIBUTIONS_1,
+        #     DISTRIBUTIONS_2,
+        #     DISTRIBUTIONS_3,
+        #     DISTRIBUTIONS_4,
+        #     DISTRIBUTIONS_5,
+        #     DISTRIBUTIONS_6,
+        #     DISTRIBUTIONS_7,
+        #     DISTRIBUTIONS_8,
+        #     DISTRIBUTIONS_9,
+        #     DISTRIBUTIONS_10,
+        #     DISTRIBUTIONS_11,
+        #     DISTRIBUTIONS_12
+        # ]
+        # # for testing purposes
+        DISTRIBUTIONS = [st.uniform,st.gamma,\
+                         st.expon, st.exponnorm,\
+                         st.lognorm,st.powerlaw,\
+                         st.powerlognorm, st.powernorm,\
+                         st.rdist, st.norm,\
+                         st.pareto,\
+                         st.laplace]
 
         # Estimate distribution parameters from data
         type.dist_iter+=1
 
-        DIST_LIST = ALL_DISTRIBUTIONS[type.dist_iter%12]
-
+        #DIST_LIST = ALL_DISTRIBUTIONS[type.dist_iter%12]
+        DIST_LIST = DISTRIBUTIONS
         for distribution in DIST_LIST:
             # Try to fit the distribution
             try:
@@ -680,46 +753,5 @@ class PacmanController:
     def compute_expected_values_mean(self,type):
         if len(type.list_of_values)>0:
             type.compute_mean()
-    """
-    def compute_expected_values_mean(self):
-        # Return expected values for dot 1, dot 2, dot 3
-        # TODO once we have the pdf - for every given sample we can calculte the probability for getting a positive number.
-        # v1.0 = return mean inefficiently.
-        if self.e1_flag:
-            if len(self.list_of_values_type_1)>0:
-                # convert to NumPy type:
-                list_of_type_np = np.array(self.list_of_values_type_1)
-                # estimate the pdf
-                e1_pdf = st.norm.pdf(list_of_type_np, np.mean(list_of_type_np), np.std(list_of_type_np))
-                self.e1 = sum(self.list_of_values_type_1)/len(self.list_of_values_type_1)
-                self.e1 = np.mean(e1_pdf)
-            else:
-                self.e1 = max(self.e1,self.e2,self.e3,0)
-        if self.e2_flag:
-            if len(self.list_of_values_type_2)>0:
-                # convert to NumPy type:
-                list_of_type_np = np.array(self.list_of_values_type_2)
-                # estimate the pdf
-                e2_pdf = st.norm.pdf(list_of_type_np, np.mean(list_of_type_np), np.std(list_of_type_np))
-                self.e2 = sum(self.list_of_values_type_2)/len(self.list_of_values_type_2)
-                self.e2 = np.mean(e2_pdf)
-            else:
-                self.e2 = max(self.e1,self.e2,self.e3,0)
-        if self.e3_flag:
-            if len(self.list_of_values_type_3)>0:
-                # convert to NumPy type:
-                list_of_type_np = np.array(self.list_of_values_type_3)
-                # estimate the pdf
-                e3_pdf = st.norm.pdf(list_of_type_np, np.mean(list_of_type_np), np.std(list_of_type_np))
-                self.e3 = sum(self.list_of_values_type_3)/len(self.list_of_values_type_3)
-                self.e3 = np.mean(e3_pdf)
-            else:
-                self.e3 = max(self.e1,self.e2,self.e3,0)
-
-        # TO DO: v2.0 guess distribution and return expected value.
-        print("estimsted dot means: ", [self.e1, self.e2, self.e3])
-        return
-    """
-
 
 
