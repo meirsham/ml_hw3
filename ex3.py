@@ -148,6 +148,12 @@ class PacmanState:
         self.e3=e3
         self.numb_of_dots_within_three = self.get_dot_neighbors()
         self.numb_of_dots_div_board_size = self.numb_of_dots_within_three / self.size_of_board
+        # initialize location of all the dots
+        self.list_of_dots = {}
+        for number_of_row, row in enumerate(board_state):
+            for number_of_column, cell in enumerate(row):
+                if cell%10 == 1 or cell%10 == 2 or cell%10 == 3:
+                    self.list_of_dots[(number_of_row, number_of_column)] = cell
 
     def get_size_of_board(self):
         len(self.state)
@@ -376,13 +382,68 @@ class PacmanState:
         # The function doesn't return anything.
         # for example, h_val = score - (# of ghosts remaining)^2
         # md to nearest dot
+        estimated_reward = 0
+        next_tile = None
+        if "pacman" in self.special_things and self.special_things["pacman"] != "dead":
+            current_tile_x, current_tile_y = self.special_things["pacman"]
+            for num_of_steps in range(0,10):
+                #current_tile_x, current_tile_y = self.special_things["pacman"]
+                [estimated_reward, current_tile_x, current_tile_y] = self.estimate_best_path_rewrad(estimated_reward, current_tile_x, current_tile_y)
+
         self.exp_value_nearby = self.get_dot_neighbors()
 
-
-        self.h_val = 10*self.score - 10*self.numb_of_ghosts**2 + self.exp_value_nearby   #new value
+        self.h_val = 10*self.score - 10*self.numb_of_ghosts**2 + self.exp_value_nearby + 10*estimated_reward   #new value
 
 
         pass
+
+    def estimate_best_path_rewrad(self, estimated_reward, current_tile_x, current_tile_y):
+        min_md = 2**32-1
+        possible_reward = 0
+        # measure MD to all pills
+        next_tile = None
+        for action in {"U", "D", "L", "R"}:
+            #current_tile_x, current_tile_y = self.special_things["pacman"]
+            if action == "U":
+                next_tile = (current_tile_x - 1, current_tile_y)
+            if action == "R":
+                next_tile = (current_tile_x, current_tile_y + 1)
+            if action == "D":
+                next_tile = (current_tile_x + 1, current_tile_y)
+            if action == "L":
+                next_tile = (current_tile_x, current_tile_y - 1)
+            # wall
+            if next_tile  not in self.state.keys():
+                continue
+            assert next_tile is not None
+            if self.state[next_tile] not in checker.WALKABLE_TILES:
+                continue
+            for cell_dot in self.list_of_dots:
+                # make sure the dot still exists
+                if self.state[cell_dot] == 11  and self.e1 > 0:
+                    cur_md = abs(next_tile[0]-cell_dot[0]) + abs(next_tile[1]-cell_dot[1])
+                    if cur_md < min_md :
+                        min_md = cur_md
+                        possible_reward = self.whats_next(next_tile, self.e1)
+                elif self.state[cell_dot] == 12 and self.e2 > 0:
+                    cur_md = abs(next_tile[0]-cell_dot[0]) + abs(next_tile[1]-cell_dot[1])
+                    if cur_md < min_md :
+                        min_md = cur_md
+                        possible_reward = self.whats_next(next_tile, self.e2)
+                elif self.state[cell_dot] == 13 and self.e3 > 0:
+                    cur_md = abs(next_tile[0]-cell_dot[0]) + abs(next_tile[1]-cell_dot[1])
+                    if cur_md < min_md :
+                        min_md = cur_md
+                        possible_reward = self.whats_next(next_tile, self.e3)
+
+        estimated_reward+=possible_reward
+        return [estimated_reward, next_tile[0], next_tile[1]]
+
+    def whats_next(self, next_tile, dot_val):
+        if self.state[next_tile] == 10:
+            return 0
+        else:
+            return dot_val
 
     def get_possible_moves(self,special_thing):
         # pacman is alive and cannot move into a wall or a ghost or a poison!
@@ -461,8 +522,7 @@ class PacmanController:
         # Need to create different distributions for each type of ball. {1: st.norm, 2: st.norm, 3: st.norm}
         self.state = state #original state.
         self.dots_count = self.eval_dots()
-        print(self.dots_count)
-
+        #print(self.dots_count)
         #new stuff
         self.type_1 = DistributionType(self.dots_count[1])
         self.type_2 = DistributionType(self.dots_count[2])
@@ -588,6 +648,9 @@ class PacmanController:
 
         # Second round
         for each_state in all_next_round_possible_states:
+            if (time.time() - self.last_time_round ) > 4.9:
+                # break for-loop and choose a random action to return
+                break
             round_2_states = []
             if each_state.special_things["pacman"] is not "dead":
                 round_2_states = list(self.get_next_round_states(each_state))
