@@ -264,7 +264,8 @@ class Evaluator:
             val = eval_temp.evaluate_agent()
             print(val)
             results.append(val)
-        return results
+        avg = sum(results)/len(results)
+        return (avg,results)
 
 
 if __name__ == '__main__':
@@ -378,7 +379,7 @@ if __name__ == '__main__':
 
     results = []
 
-    number_of_simulations = 5
+    number_of_simulations = 15
     for problem, num_of_steps,  pill_rewards_dict, ghost_movement_probabilities, diagonal_moving in problems:
         my_eval = Evaluator(ex3.PacmanController(problem, num_of_steps), problem, num_of_steps,
                             pill_rewards_dict, ghost_movement_probabilities, diagonal_moving)
