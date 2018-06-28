@@ -255,6 +255,17 @@ class Evaluator:
         self.state[current_tile] = 10
         self.special_things["pacman"] = next_tile
 
+    def simulate(self,number_of_simulations):
+        results = []
+
+        for i in range(number_of_simulations):
+            eval_temp = deepcopy(my_eval)
+
+            val = eval_temp.evaluate_agent()
+            print(val)
+            results.append(val)
+        return results
+
 
 if __name__ == '__main__':
     problems = (
@@ -329,7 +340,6 @@ if __name__ == '__main__':
              (99, 11, 12, 13, 11, 12, 13, 11, 12, 13, 12, 12, 99),
              (99, 11, 12, 13, 11, 12, 13, 11, 12, 13, 13, 13, 99),
              (99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99),
-
          ),
          30,
          {"11": create_uniform_probability(0.1, 0.5), "12": create_normal_probability(-1, 0.2),
@@ -368,11 +378,13 @@ if __name__ == '__main__':
 
     results = []
 
-    for problem, num_of_steps, pill_rewards_dict, ghost_movement_probabilities, diagonal_moving in problems:
+    number_of_simulations = 5
+    for problem, num_of_steps,  pill_rewards_dict, ghost_movement_probabilities, diagonal_moving in problems:
         my_eval = Evaluator(ex3.PacmanController(problem, num_of_steps), problem, num_of_steps,
                             pill_rewards_dict, ghost_movement_probabilities, diagonal_moving)
+        results.append(my_eval.simulate(number_of_simulations))
         print("new problem Daniel")
-        results.append(my_eval.evaluate_agent())
+        #results.append(my_eval.evaluate_agent())
 
     for number, result in enumerate(results):
-        print("the result for input", number + 1, "is", result)
+        print("the average result after", number_of_simulations, "for input", number + 1, "is", result)
